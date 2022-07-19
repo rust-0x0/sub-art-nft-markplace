@@ -29,8 +29,7 @@ mod sub_auction {
     /// A token ID.
     pub type TokenId = u32;
 
-    /// A Transaction is what every `owner` can submit for confirmation by other owners.
-    /// If enough owners agree it will be executed by the contract.
+   
     #[derive(scale::Encode, scale::Decode, SpreadLayout, PackedLayout)]
     #[cfg_attr(
         feature = "std",
