@@ -19,7 +19,7 @@ scale-info = { version = "2", default-features = false, features = ["derive"], o
 [lib]
 name = "sub_bundle_marketplace"
 path = "lib.rs"
-crate-type = ["cdylib"]
+crate-type = ["cdylib","rlib"]
 
 [features]
 default = ["std"]

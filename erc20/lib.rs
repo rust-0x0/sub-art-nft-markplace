@@ -1,4 +1,5 @@
 #![cfg_attr(not(feature = "std"), no_std)]
+pub use self::erc20::{Erc20,Erc20Ref};
 
 use ink_lang as ink;
 

@@ -49,9 +49,9 @@
 //! Tokens can be destroyed by burning them. Only the token owner is allowed to burn a token.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+pub use self::erc721::{Erc721,Erc721Ref};
 
 use ink_lang as ink;
-pub use self::erc721::{Erc721};
 
 #[ink::contract]
 mod erc721 {
@@ -66,7 +66,7 @@ mod erc721 {
     };
 
     /// A token ID.
-    pub type TokenId = u32;
+    pub type TokenId = u128;
 
     #[ink(storage)]
     #[derive(Default, SpreadAllocate)]

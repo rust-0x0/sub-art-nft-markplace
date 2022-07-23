@@ -3,6 +3,7 @@
 //! This is an ERC-721 Token implementation.
 
 #![cfg_attr(not(feature = "std"), no_std)]
+pub use self::sub_bundle_marketplace::{SubBundleMarketplace,SubBundleMarketplaceRef};
 
 use ink_lang as ink;
 
@@ -37,7 +38,7 @@ mod sub_bundle_marketplace {
     /// A token ID.
     pub type TokenId = u128;
 
-    #[derive(scale::Encode, scale::Decode, SpreadLayout, PackedLayout)]
+    #[derive( Default,scale::Encode, scale::Decode, SpreadLayout, PackedLayout)]
     #[cfg_attr(
         feature = "std",
         derive(
@@ -57,7 +58,7 @@ mod sub_bundle_marketplace {
         pub starting_time: u128,
     }
 
-    #[derive(scale::Encode, scale::Decode, SpreadLayout, PackedLayout)]
+    #[derive( Default,scale::Encode, scale::Decode, SpreadLayout, PackedLayout)]
     #[cfg_attr(
         feature = "std",
         derive(
@@ -882,7 +883,7 @@ FailedToSendTheOwnerFeeTransferFailed,
             //                     // us to do
             //                     ink_env::debug_println!(
             //                         "Recipient at {:?} from is not a smart contract ({:?})",
-            //                         from,
+            //                        callee,
             //                         e
             //                     );
             //                 }
@@ -926,7 +927,7 @@ FailedToSendTheOwnerFeeTransferFailed,
             Ok(())
         }
         /**
-        @notice Update FantomAddressRegistry contract
+        @notice Update SubAddressRegistry contract
         @dev Only admin
         */
         #[ink(message)]

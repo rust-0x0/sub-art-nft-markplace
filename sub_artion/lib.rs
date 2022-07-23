@@ -25,7 +25,7 @@ mod sub_artion {
     use scale::{Decode, Encode};
 
     /// A token ID.
-    pub type TokenId = u32;
+    pub type TokenId = u128;
 
     /// The interface for an ERC-1155 compliant contract.
     ///
@@ -42,31 +42,31 @@ mod sub_artion {
         ///
         /// This represents the amount of unique tokens the owner has.
         #[ink(message)]
-        fn   balance_of(&self, owner: AccountId) -> u32;
+        fn balance_of(&self, owner: AccountId) -> u32;
 
         /// Returns the owner of the token.
         #[ink(message)]
-        fn   owner_of(&self, id: TokenId) -> Option<AccountId>;
+        fn owner_of(&self, id: TokenId) -> Option<AccountId>;
 
         /// Returns the approved account ID for this token if any.
         #[ink(message)]
-        fn   get_approved(&self, id: TokenId) -> Option<AccountId>;
+        fn get_approved(&self, id: TokenId) -> Option<AccountId>;
 
         /// Returns `true` if the operator is approved by the owner.
         #[ink(message)]
-        fn   is_approved_for_all(&self, owner: AccountId, operator: AccountId) -> bool;
+        fn is_approved_for_all(&self, owner: AccountId, operator: AccountId) -> bool;
 
         /// Approves or disapproves the operator for all tokens of the caller.
         #[ink(message)]
-        fn   set_approval_for_all(&mut self, to: AccountId, approved: bool) -> Result<()>;
+        fn set_approval_for_all(&mut self, to: AccountId, approved: bool) -> Result<()>;
 
         /// Approves the account to transfer the specified token on behalf of the caller.
         #[ink(message)]
-        fn   approve(&mut self, to: AccountId, id: TokenId) -> Result<()>;
+        fn approve(&mut self, to: AccountId, id: TokenId) -> Result<()>;
 
         /// Transfer approved or owned token.
         #[ink(message)]
-        fn   transfer_from(&mut self, from: AccountId, to: AccountId, id: TokenId) -> Result<()>;
+        fn transfer_from(&mut self, from: AccountId, to: AccountId, id: TokenId) -> Result<()>;
         /// Transfers the token from the caller to the given destination.
         #[ink(message)]
         fn transfer(&mut self, destination: AccountId, id: TokenId) -> Result<()>;
@@ -92,7 +92,7 @@ mod sub_artion {
         operator_approvals: Mapping<(AccountId, AccountId), ()>,
         ///  current max tokenId
         token_id_pointer: TokenId,
-        ///  TokenID -> Uri 
+        ///  TokenID -> Uri
         token_uris: Mapping<TokenId, String>,
         /// # note Platform fee
         platform_fee: Balance,
@@ -116,7 +116,7 @@ mod sub_artion {
         OnlyOwner,
         TokenURIIsEmpty,
         DesignerIsZeroAddress,
-TokenShouldExist,
+        TokenShouldExist,
     }
 
     // The SubArtion result types.
@@ -206,12 +206,13 @@ TokenShouldExist,
             // Mint token and set token URI
             self.add_token_to(&caller, token_id)?;
             // _setTokenURI(tokenId, token_uri);  //TODO
-            self.set_token_uri(token_id,&token_uri)?;
+            self.set_token_uri(token_id, &token_uri)?;
             // Send NativeToken fee to fee recipient
-            ensure!(self
-                .env()
-                .transfer(self.fee_recipient, self.env().transferred_value())
-                .is_ok(), Error::InsufficientFundsToMint
+            ensure!(
+                self.env()
+                    .transfer(self.fee_recipient, self.env().transferred_value())
+                    .is_ok(),
+                Error::InsufficientFundsToMint
             );
             self.env().emit_event(Minted {
                 token_id,
@@ -263,25 +264,17 @@ TokenShouldExist,
         @param fee_recipient payable address the address to sends the funds to
         */
         #[ink(message)]
-        pub fn update_platform_fee_recipient(
-            &mut self,
-            fee_recipient: AccountId,
-        ) -> Result<()> {
+        pub fn update_platform_fee_recipient(&mut self, fee_recipient: AccountId) -> Result<()> {
             //onlyOwner
             ensure!(self.env().caller() == self.owner, Error::OnlyOwner);
             self.fee_recipient = fee_recipient;
-            self.env().emit_event(UpdatePlatformFeeRecipient {
-                fee_recipient,
-            });
+            self.env()
+                .emit_event(UpdatePlatformFeeRecipient { fee_recipient });
             Ok(())
         }
-        pub fn set_token_uri(
-            &mut self,
-            token_id: TokenId,
-            uri: &String,
-        ) -> Result<()> {
+        pub fn set_token_uri(&mut self, token_id: TokenId, uri: &String) -> Result<()> {
             ensure!(self.exists(token_id), Error::TokenShouldExist);
-            self.token_uris.insert(&token_id,uri);
+            self.token_uris.insert(&token_id, uri);
 
             Ok(())
         }
@@ -464,45 +457,45 @@ TokenShouldExist,
         ///
         /// This represents the amount of unique tokens the owner has.
         #[ink(message)]
-        fn  balance_of(&self, owner: AccountId) -> u32 {
+        fn balance_of(&self, owner: AccountId) -> u32 {
             self.balance_of_or_zero(&owner)
         }
 
         /// Returns the owner of the token.
         #[ink(message)]
-        fn  owner_of(&self, id: TokenId) -> Option<AccountId> {
+        fn owner_of(&self, id: TokenId) -> Option<AccountId> {
             self.token_owner.get(&id)
         }
 
         /// Returns the approved account ID for this token if any.
         #[ink(message)]
-        fn  get_approved(&self, id: TokenId) -> Option<AccountId> {
+        fn get_approved(&self, id: TokenId) -> Option<AccountId> {
             self.token_approvals.get(&id)
         }
 
         /// Returns `true` if the operator is approved by the owner.
         #[ink(message)]
-        fn  is_approved_for_all(&self, owner: AccountId, operator: AccountId) -> bool {
+        fn is_approved_for_all(&self, owner: AccountId, operator: AccountId) -> bool {
             self.approved_for_all(owner, operator)
         }
 
         /// Approves or disapproves the operator for all tokens of the caller.
         #[ink(message)]
-        fn  set_approval_for_all(&mut self, to: AccountId, approved: bool) -> Result<()> {
+        fn set_approval_for_all(&mut self, to: AccountId, approved: bool) -> Result<()> {
             self.approve_for_all(to, approved)?;
             Ok(())
         }
 
         /// Approves the account to transfer the specified token on behalf of the caller.
         #[ink(message)]
-        fn  approve(&mut self, to: AccountId, id: TokenId) -> Result<()> {
+        fn approve(&mut self, to: AccountId, id: TokenId) -> Result<()> {
             self.approve_for(&to, id)?;
             Ok(())
         }
 
         /// Transfer approved or owned token.
         #[ink(message)]
-        fn  transfer_from(&mut self, from: AccountId, to: AccountId, id: TokenId) -> Result<()> {
+        fn transfer_from(&mut self, from: AccountId, to: AccountId, id: TokenId) -> Result<()> {
             self.transfer_token_from(&from, &to, id)?;
             Ok(())
         }
@@ -566,7 +559,6 @@ TokenShouldExist,
         use super::*;
         use ink_lang as ink;
 
-        
         fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
         }

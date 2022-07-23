@@ -4,9 +4,16 @@
 //!
 
 #![cfg_attr(not(feature = "std"), no_std)]
+pub use self::sub_token_registry::{SubTokenRegistry,SubTokenRegistryRef};
 
 use ink_lang as ink;
-
+macro_rules! ensure {
+    ( $condition:expr, $error:expr $(,)? ) => {{
+        if !$condition {
+            return ::core::result::Result::Err(::core::convert::Into::into($error));
+        }
+    }};
+}
 #[ink::contract]
 mod sub_token_registry {
     use ink_lang as ink;
@@ -29,6 +36,8 @@ mod sub_token_registry {
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum Error {
         OnlyOwner,
+TokenAlreadyAdded,
+TokenNotExist,
     }
 
     // The SubTokenRegistry result types.
@@ -88,7 +97,10 @@ mod sub_token_registry {
              });
             Ok(())
         }
-        
+          #[ink(message)]
+        pub fn enabled(&self,token:AccountId)->bool{
+            self.enabled.get(token).unwrap_or(false)
+        }
     }
 
     /// Unit tests
