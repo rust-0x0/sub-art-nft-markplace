@@ -91,7 +91,7 @@ TokenNotExist,
             //onlyOwner
             ensure!(self.env().caller() == self.owner, Error::OnlyOwner);
             ensure!(self.enabled.get(&token).unwrap_or(false), Error::TokenNotExist);
-            self.enabled.insert(&token,&false);
+            self.enabled.remove(&token);
         self.env().emit_event(TokenRemoved {
                 token,
              });

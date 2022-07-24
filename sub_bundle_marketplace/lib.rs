@@ -121,6 +121,7 @@ InsufficientFunds,
 FeeTransferFailed,
 OwnerFeeTransferFailed,
 FailedToSendTheOwnerFeeTransferFailed,
+TransactionFailed,
     }
 
     // The SubBundleMarketplace result types.
@@ -233,6 +234,31 @@ FailedToSendTheOwnerFeeTransferFailed,
             )
         }
 
+ #[cfg_attr(test, allow(unused_variables))]
+        fn token_registry_enabled(&self, callee: AccountId,token: AccountId) -> Result<bool> {
+            let mut ans = false;
+            #[cfg(not(test))]
+            {
+                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C];//0x1414631c enabled 
+                let (gas_limit,transferred_value)=(0,0);
+                let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
+                .call_type(
+                    Call::new()
+                        .callee(callee)
+                        .gas_limit(gas_limit)
+                        .transferred_value(transferred_value),
+                )
+                .exec_input(
+                    ExecutionInput::new(selector.into()).push_arg(token),
+                )
+                .returns::<bool>()
+                .fire()
+                .map_err(|_| Error::TransactionFailed);
+                ans=result?;
+            }
+            Ok(ans)
+        }
         /// @notice Method for listing NFT bundle
         /// @param _bundleID Bundle ID
         /// @param _nftAddresses Addresses of NFT contract
@@ -270,31 +296,26 @@ FailedToSendTheOwnerFeeTransferFailed,
                 Error::AlreadyListed
             );
 
-            // #[cfg(not(test))]
-            // {
-            //     ensure!(
-            //         AccountId::from([0x0; 32]) != self.address_registry,
-            //         Error::InvalidPayToken
-            //     );
-            //     use address_registry::AddressRegistry;
-            //     let address_registry_instance: AddressRegistry =
-            //         ink_env::call::FromAccountId::from_account_id(self.address_registry);
+            #[cfg(not(test))]
+            {
+                ensure!(
+                    AccountId::from([0x0; 32]) != self.address_registry,
+                    Error::InvalidPayToken
+                );
+                let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
+                    ink_env::call::FromAccountId::from_account_id(self.address_registry);
 
-            //     if pay_token != AccountId::from([0x0; 32]) {
-            //         ensure!(
-            //             AccountId::from([0x0; 32]) != address_registry_instance.token_registry(),
-            //             Error::InvalidPayToken
-            //         );
-            //         let token_registry_instance: TokenRegistry =
-            //             ink_env::call::FromAccountId::from_account_id(
-            //                 address_registry_instance.token_registry(),
-            //             );
-            //         ensure!(
-            //             token_registry_instance.enabled(pay_token),
-            //             Error::InvalidPayToken,
-            //         );
-            //     }
-            // }
+                if pay_token != AccountId::from([0x0; 32]) {
+                    ensure!(
+                        AccountId::from([0x0; 32]) != address_registry_instance.token_registry(),
+                        Error::InvalidPayToken
+                    );
+                    ensure!(
+                        self.token_registry_enabled( address_registry_instance.token_registry(),pay_token).unwrap_or(false),
+                        Error::InvalidPayToken,
+                    );
+                }
+            }
             listing.nfts.clear();
             listing.token_ids.clear();
             listing.quantities.clear();
@@ -302,40 +323,31 @@ FailedToSendTheOwnerFeeTransferFailed,
                 let token_id = token_ids[i];
                 let quantity = quantities[i];
 
-                // #[cfg(not(test))]
-                // {
-                //     if self.supports_interface_check(nft_address, INTERFACE_ID_ERC721) {
-                //         use erc721::Erc721;
-                //         let erc721_instance: Erc721 =
-                //             ink_env::call::FromAccountId::from_account_id(nft_address);
-                //         ensure!(
-                //             self.env().caller() == erc721_instance.owner_of(token_id),
-                //             Error::NotOwningItem
-                //         );
-                //         ensure!(
-                //             erc721_instance
-                //                 .is_approved_for_all(self.env().caller(), self.env().account_id()),
-                //             Error::ItemNotApproved
-                //         );
-                //         listing.quantities.push(1);
-                //     } else if self.supports_interface_check(nft_address, INTERFACE_ID_ERC1155) {
-                //         use erc1155::Erc1155;
-                //         let erc1155_instance: Erc1155 =
-                //             ink_env::call::FromAccountId::from_account_id(self.address_registry);
-
-                //         ensure!(
-                //             quantity <= erc1155_instance.balance_of(self.env().caller(), token_id),
-                //             Error::MustHoldEnoughNFTs
-                //         );
-                //         ensure!(
-                //             erc1155_instance
-                //                 .is_approved_for_all(self.env().caller(), self.env().account_id()),
-                //             Error::ItemNotApproved
-                //         );
-                //     } else {
-                //         ensure!(false, Error::InvalidNFTAddress);
-                //     }
-                // }
+                #[cfg(not(test))]
+                {
+                    if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
+                      ensure!(
+                    Some(self.env().caller()) == self.erc721_owner_of(nft_address,token_id)?,
+                    Error::NotOwningItem
+                );
+               ensure!(
+                    self.erc721_is_approved_for_all(nft_address,self.env().caller(), self.env().account_id()).unwrap_or(false),
+                    Error::ItemNotApproved
+                );
+                        listing.quantities.push(1);
+                    } else if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155) {
+                            ensure!(
+                    quantity <= self.erc1155_balance_of(nft_address,self.env().caller())?,
+                    Error::MustHoldEnoughNFTs
+                );
+         ensure!(
+                    self.erc1155_is_approved_for_all(nft_address,self.env().caller(), self.env().account_id()).is_ok(),
+                    Error::ItemNotApproved
+                );
+                    } else {
+                        ensure!(false, Error::InvalidNFTAddress);
+                    }
+                }
                 listing.nfts.push(nft_address);
                 listing.token_ids.push(token_id);
                 let mut items = self
@@ -461,34 +473,26 @@ FailedToSendTheOwnerFeeTransferFailed,
                 let token_id = listing.token_ids[i];
                 let quantity = listing.quantities[i];
 
-                // #[cfg(not(test))]
-                // {
-                //     if self.supports_interface_check(nft_address, INTERFACE_ID_ERC721) {
-                //         use erc721::Erc721;
-                //         let erc721_instance: Erc721 =
-                //             ink_env::call::FromAccountId::from_account_id(nft_address);
-                //         ensure!(
-                //             self.env().caller() == erc721_instance.owner_of(token_id),
-                //             Error::NotOwningItem
-                //         );
-                //         ensure!(
-                //             erc721_instance
-                //                 .is_approved_for_all(self.env().caller(), self.env().account_id()),
-                //             Error::ItemNotApproved
-                //         );
-                //     } else if self.supports_interface_check(nft_address, INTERFACE_ID_ERC1155) {
-                //         use erc1155::Erc1155;
-                //         let erc1155_instance: Erc1155 =
-                //             ink_env::call::FromAccountId::from_account_id(self.address_registry);
-
-                //         ensure!(
-                //             quantity <= erc1155_instance.balance_of(owner, token_id),
-                //             Error::MustHoldEnoughNFTs
-                //         );
-                //     } else {
-                //         ensure!(false, Error::InvalidNFTAddress);
-                //     }
-                // }
+                #[cfg(not(test))]
+                {
+                    if self.supports_interface_check(nft_address,  crate::INTERFACE_ID_ERC721) {
+  ensure!(
+                    Some(self.env().caller()) == self.erc721_owner_of(nft_address,token_id)?,
+                    Error::NotOwningItem
+                );
+               ensure!(
+                    self.erc721_is_approved_for_all(nft_address,self.env().caller(), self.env().account_id()).unwrap_or(false),
+                    Error::ItemNotApproved
+                );
+                     } else if self.supports_interface_check(nft_address,  crate::INTERFACE_ID_ERC1155) {
+                                    ensure!(
+                    quantity <= self.erc1155_balance_of(nft_address,owner)?,
+                    Error::MustHoldEnoughNFTs
+                );
+                    } else {
+                        ensure!(false, Error::InvalidNFTAddress);
+                    }
+                }
             }
 
             ensure!(
@@ -510,78 +514,42 @@ FailedToSendTheOwnerFeeTransferFailed,
                     Error::OwnerFeeTransferFailed
                 );
             } else {
-                // #[cfg(not(test))]
-                // {
-                //     use erc20::Erc20;
-                //     let erc20_instance: Erc20 =
-                //         ink_env::call::FromAccountId::from_account_id(auction.pay_token);
-                //     ensure!(
-                //         erc20_instance
-                //             .transfer_from(self.env().caller(), fee_recipient, fee_amount)
-                //             .is_ok(),
-                //         Error::FailedToSendTheOwnerFeeTransferFailed
-                //     );
-                //     ensure!(
-                //         erc20_instance
-                //             .transfer_from(self.env().caller(), owner, price - fee_amount)
-                //             .is_ok(),
-                //         Error::FailedToSendTheOwnerFeeTransferFailed
-                //     );
-                // }
+                            ensure!(
+                         self.erc20_transfer_from(
+                pay_token,
+                self.env().caller(),
+                self.fee_recipient,
+                fee_amount,
+            ).is_ok(),
+                        Error::FailedToSendTheOwnerFeeTransferFailed
+                    );
+                    ensure!(
+                       self.erc20_transfer_from(pay_token, self.env().caller(), owner, price - fee_amount)
+                            .is_ok(),
+                        Error::FailedToSendTheOwnerFeeTransferFailed
+                    );
             }
 
             for (i, &nft_address) in listing.nfts.iter().enumerate() {
                 let token_id = listing.token_ids[i];
                 let quantity = listing.quantities[i];
 
-                // #[cfg(not(test))]
-                // {
-                //     if self.supports_interface_check(nft_address, INTERFACE_ID_ERC721) {
-                //         use erc721::Erc721;
-                //         let erc721_instance: Erc721 =
-                //             ink_env::call::FromAccountId::from_account_id(nft_address);
-                //         ensure!(
-                //             erc721_instance
-                //                 .transfer_from(owner, self.env().caller(), token_id)
-                //                 .is_ok(),
-                //             Error::NotOwningItem
-                //         );
-                //     } else if self.supports_interface_check(nft_address, INTERFACE_ID_ERC1155) {
-                //         use erc1155::Erc1155;
-                //         let erc1155_instance: Erc1155 =
-                //             ink_env::call::FromAccountId::from_account_id(self.address_registry);
-
-                //         ensure!(
-                //             erc1155_instance.transfer_from(
-                //                 owner,
-                //                 self.env().caller(),
-                //                 token_id,
-                //                 listing.quantity,
-                //                 Vec::new()
-                //             ),
-                //             Error::NotOwningItem
-                //         );
-                //     }
-                //     use address_registry::AddressRegistry;
-                //     let address_registry_instance: AddressRegistry =
-                //         ink_env::call::FromAccountId::from_account_id(self.address_registry);
-
-                //     ensure!(
-                //         AccountId::from([0x0; 32])
-                //             == address_registry_instance.bundle_marketplace(),
-                //         Error::InvalidPayToken
-                //     );
-                //     let marketplace_instance: BundleMarketplace =
-                //         ink_env::call::FromAccountId::from_account_id(
-                //             address_registry_instance.marketplace(),
-                //         );
-                //     marketplace_instance.validate_item_sold(
-                //         nft_address,
-                //         token_id,
-                //         owner,
-                //         self.env().caller(),
-                //     );
-                // }
+                #[cfg(not(test))]
+                {
+                    if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
+                self.erc721_transfer_from(nft_address, owner, self.env().caller(), token_id)?;
+                    } else if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155) {
+                           self.erc1155_transfer_from(
+                    nft_address,
+                    owner,
+                    self.env().caller(),
+                    token_id,
+                    quantity,
+                )?;
+                    }
+            self.marketplace_validate_item_sold(nft_address, token_id,      owner,
+                        self.env().caller(),)?;
+                }
             }
             self.listings.remove(&(owner, _bundle_id.clone()));
             listing.price = 0;
@@ -594,7 +562,7 @@ FailedToSendTheOwnerFeeTransferFailed,
                 buyer: self.env().caller(),
                 bundle_id:bundle_id.clone(),
                 pay_token,
-                unit_price: self.get_price(pay_token),
+                unit_price: self.get_price(pay_token)?,
                 price,
             });
             self.env().emit_event(OfferCanceled {
@@ -602,6 +570,114 @@ FailedToSendTheOwnerFeeTransferFailed,
                 bundle_id,
             });
             Ok(())
+        }
+fn marketplace_validate_item_sold(
+            &self,
+            nft_address: AccountId,
+            token_id: TokenId,
+                     seller: AccountId,
+            buyer: AccountId,
+        ) -> Result<()> {
+            #[cfg(not(test))]
+            {
+                let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
+                    ink_env::call::FromAccountId::from_account_id(self.address_registry);
+
+                ensure!(
+                    AccountId::from([0x0; 32]) == address_registry_instance.marketplace(),
+                    Error::InvalidPayToken
+                );
+                self._marketplace_validate_item_sold(address_registry_instance.marketplace(),nft_address, token_id, seller,buyer)?;
+            }
+            Ok(())
+        }
+        fn  _marketplace_validate_item_sold(
+            &self,
+            token: AccountId,
+            nft_address: AccountId,
+            token_id:TokenId,
+                      seller: AccountId,
+            buyer: AccountId,
+        ) -> Result<()> {
+            #[cfg(not(test))]
+            {
+                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E];//owner_of  
+                let (gas_limit,transferred_value)=(0,0);
+                let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
+                .call_type(
+                    Call::new()
+                        .callee(token)
+                        .gas_limit(gas_limit)
+                        .transferred_value(transferred_value),
+                )
+                .exec_input(
+                    ExecutionInput::new(selector.into()).push_arg(nft_address).push_arg(token_id).push_arg(seller).push_arg(buyer),
+                )
+                .returns::<(AccountId,Balance)>()
+                .fire()
+                .map_err(|_| Error::TransactionFailed);
+                ensure!(result.is_ok(),Error::TransactionFailed);
+            }
+            Ok(())
+        }
+fn erc1155_is_approved_for_all(
+            &self,
+            token: AccountId,
+            owner: AccountId,
+            operator: AccountId,
+        ) -> Result<bool> {
+            let mut ans = false;
+            #[cfg(not(test))]
+            {
+                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                let selector: [u8; 4] = [0x36, 0x03, 0x4D, 0x3E];//is_approved_for_all  
+                let (gas_limit,transferred_value)=(0,0);
+                let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
+                .call_type(
+                    Call::new()
+                        .callee(token)
+                        .gas_limit(gas_limit)
+                        .transferred_value(transferred_value),
+                )
+                .exec_input(
+                    ExecutionInput::new(selector.into()).push_arg(owner).push_arg(operator),
+                )
+                .returns::<bool>()
+                .fire()
+                .map_err(|_| Error::TransactionFailed);
+                ans=result?;
+            }
+            Ok(ans)
+        }
+
+        fn  marketplace_get_price(
+            &self,
+            token: AccountId,
+            nft_address: AccountId,
+        ) -> Result<Balance> {
+            let mut ans=0;
+            #[cfg(not(test))]
+            {
+                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E];//owner_of  
+                let (gas_limit,transferred_value)=(0,0);
+                let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
+                .call_type(
+                    Call::new()
+                        .callee(token)
+                        .gas_limit(gas_limit)
+                        .transferred_value(transferred_value),
+                )
+                .exec_input(
+                    ExecutionInput::new(selector.into()).push_arg(nft_address),
+                )
+                .returns::<Balance>()
+                .fire()
+                .map_err(|_| Error::TransactionFailed);
+               ans=result?;
+            }
+            Ok(ans)
         }
         /// @notice Method for offering bundle item
         /// @param _bundleID Bundle ID
@@ -676,18 +752,13 @@ FailedToSendTheOwnerFeeTransferFailed,
 
             let price = offer.price;
             let mut fee_amount = price * self.platform_fee / 1000;
-
-            // #[cfg(not(test))]
-            // {
-            //     use erc20::Erc20;
-            //     let erc20_instance: Erc20 =
-            //         ink_env::call::FromAccountId::from_account_id(offer.pay_token);
-            //     let result = erc20_instance.transfer_from(creator, fee_amount, fee_amount);
-            //     ensure!(result.is_ok(), Error::InsufficientBalanceOrNotApproved);
-            //     let result =
-            //         erc20_instance.transfer_from(creator, self.env().caller(), price - fee_amount);
-            //     ensure!(result.is_ok(), Error::InsufficientBalanceOrNotApproved);
-            // }
+                        self.erc20_transfer_from(
+                offer.pay_token,
+                creator,
+                self.fee_recipient,
+                fee_amount,
+            )?;
+         self.erc20_transfer_from(offer.pay_token, self.env().caller(), owner, price - fee_amount)?;
 
             let mut listing = self
                 .listings
@@ -698,50 +769,23 @@ FailedToSendTheOwnerFeeTransferFailed,
                 let token_id = listing.token_ids[i];
                 let quantity = listing.quantities[i];
 
-                // #[cfg(not(test))]
-                // {
-                //     // Transfer NFT to buyer
-                //     if self.supports_interface_check(nft_address, INTERFACE_ID_ERC721) {
-                //         use erc721::Erc721;
-                //         let erc721_instance: Erc721 =
-                //             ink_env::call::FromAccountId::from_account_id(nft_address);
-                //         ensure!(
-                //             erc721_instance
-                //                 .transfer_from(self.env().caller(), creator, token_id)
-                //                 .is_ok(),
-                //             Error::NotOwningItem
-                //         );
-                //     } else if self.supports_interface_check(nft_address, INTERFACE_ID_ERC1155) {
-                //         use erc1155::Erc1155;
-                //         let erc1155_instance: Erc1155 =
-                //             ink_env::call::FromAccountId::from_account_id(self.address_registry);
-
-                //         ensure!(
-                //             erc1155_instance.transfer_from(
-                //                 self.env().caller(),
-                //                 creator,
-                //                 token_id,
-                //                 quantity,
-                //                 Vec::new()
-                //             ),
-                //             Error::NotOwningItem
-                //         );
-                //     }
-                //     use address_registry::AddressRegistry;
-                //     let address_registry_instance: AddressRegistry =
-                //         ink_env::call::FromAccountId::from_account_id(self.address_registry);
-
-                //     ensure!(
-                //         AccountId::from([0x0; 32])
-                //             == address_registry_instance.bundle_marketplace(),
-                //         Error::InvalidPayToken
-                //     );
-                //     let marketplace_instance: BundleMarketplace =
-                //         ink_env::call::FromAccountId::from_account_id(
-                //             address_registry_instance.marketplace(),
-                //         );
-                //     marketplace_instance.validate_item_sold(nft_address, token_id, owner, creator);
-                // }
+                #[cfg(not(test))]
+                {
+                    // Transfer NFT to buyer
+                    if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
+                self.erc721_transfer_from(nft_address, self.env().caller(), creator, token_id)?;
+                    } else if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155) {
+                        self.erc1155_transfer_from(
+                    nft_address,
+                      self.env().caller(),
+                                creator,
+                    token_id,
+                    quantity,
+                )?;
+                
+                    }
+                    self.marketplace_validate_item_sold(nft_address, token_id, owner, creator);
+                }
             }
             self.listings.remove(&(self.env().caller(), _bundle_id.clone()));
             listing.price = 0;
@@ -754,32 +798,170 @@ FailedToSendTheOwnerFeeTransferFailed,
                 buyer: creator,
                 bundle_id:bundle_id.clone(),
                 pay_token: offer.pay_token,
-                unit_price: self.get_price(offer.pay_token),
+                unit_price: self.get_price(offer.pay_token)?,
                 price: offer.price,
             });
             self.env().emit_event(OfferCanceled { creator, bundle_id });
             Ok(())
         }
+fn erc721_transfer_from(
+            &mut self,
+            token: AccountId,
+            from: AccountId,
+            to: AccountId,
+            token_id: TokenId,
+        ) -> Result<()> {
+            #[cfg(not(test))]
+            {
+                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                let selector: [u8; 4] = [0x0B, 0x39, 0x6F, 0x18];//transfer_from
+                let (gas_limit,transferred_value)=(0,0);
+                let _ = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
+                .call_type(
+                    Call::new()
+                        .callee(token)
+                        .gas_limit(gas_limit)
+                        .transferred_value(transferred_value),
+                )
+                .exec_input(
+                    ExecutionInput::new(selector.into()).push_arg(from).push_arg(to).push_arg(token_id),
+                )
+                .returns::<()>()
+                .fire()
+                .map_err(|_| Error::TransactionFailed);
+            }
+            Ok(())
+        }
+        fn erc1155_transfer_from(
+            &mut self,
+            token: AccountId,
+            from: AccountId,
+            to: AccountId,
+            token_id: TokenId,
+            value: Balance,
+        ) -> Result<()> {
+            #[cfg(not(test))]
+            {
+                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                let selector: [u8; 4] = [0x53,0x24,0xD5,0x56];//safe_transfer_from 
+                let (gas_limit,transferred_value)=(0,0);
+                let _ = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
+                .call_type(
+                    Call::new()
+                        .callee(token)
+                        .gas_limit(gas_limit)
+                        .transferred_value(transferred_value),
+                )
+                .exec_input(
+                    ExecutionInput::new(selector.into()).push_arg(from).push_arg(to).push_arg(token_id).push_arg(value).push_arg(Vec::<u8>::new()),
+                )
+                .returns::<()>()
+                .fire()
+                .map_err(|_| Error::TransactionFailed);
+            }
+            Ok(())
+        }
+        fn erc20_transfer_from(
+            &mut self,
+            token: AccountId,
+            from: AccountId,
+            to: AccountId,
+            value: Balance,
+        ) -> Result<()> {
+            #[cfg(not(test))]
+            {
+                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                let selector: [u8; 4] = [0x0B, 0x39, 0x6F, 0x18];//transfer_from
+                let (gas_limit,transferred_value)=(0,0);
+                let _ = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
+                .call_type(
+                    Call::new()
+                        .callee(token)
+                        .gas_limit(gas_limit)
+                        .transferred_value(transferred_value),
+                )
+                .exec_input(
+                    ExecutionInput::new(selector.into()).push_arg(from).push_arg(to).push_arg(value),
+                )
+                .returns::<()>()
+                .fire()
+                .map_err(|_| Error::TransactionFailed);
+            }
+            Ok(())
+        }
 
-        fn get_price(&self, pay_token: AccountId) -> Balance {
+        fn erc721_is_approved_for_all(
+            &self,
+            token: AccountId,
+            owner: AccountId,
+            operator: AccountId,
+        ) -> Result<bool> {
+            let mut ans = false;
+            #[cfg(not(test))]
+            {
+                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                let selector: [u8; 4] = [0x0F, 0x59, 0x22, 0xE9];//is_approved_for_all  
+                let (gas_limit,transferred_value)=(0,0);
+                let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
+                .call_type(
+                    Call::new()
+                        .callee(token)
+                        .gas_limit(gas_limit)
+                        .transferred_value(transferred_value),
+                )
+                .exec_input(
+                    ExecutionInput::new(selector.into()).push_arg(owner).push_arg(operator),
+                )
+                .returns::<bool>()
+                .fire()
+                .map_err(|_| Error::TransactionFailed);
+                ans=result?;
+            }
+            Ok(ans)
+        }
+
+        fn erc721_owner_of(
+            &self,
+            token: AccountId,
+            token_id: TokenId,
+        ) -> Result<Option<AccountId>> {
+            let mut ans = None;
+            #[cfg(not(test))]
+            {
+                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E];//owner_of  
+                let (gas_limit,transferred_value)=(0,0);
+                let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
+                .call_type(
+                    Call::new()
+                        .callee(token)
+                        .gas_limit(gas_limit)
+                        .transferred_value(transferred_value),
+                )
+                .exec_input(
+                    ExecutionInput::new(selector.into()).push_arg(token_id),
+                )
+                .returns::<Option<AccountId>>()
+                .fire()
+                .map_err(|_| Error::TransactionFailed);
+                ans=result?;
+            }
+            Ok(ans)
+        }
+
+        fn get_price(&self, pay_token: AccountId) -> Result<Balance> {
             let mut unit_price = 0;
-            // #[cfg(not(test))]
-            // {
-            //     ensure!(
-            //         AccountId::from([0x0; 32]) != self.address_registry,
-            //         Error::InvalidPayToken
-            //     );
-            //     use address_registry::AddressRegistry;
-            //     let address_registry_instance: AddressRegistry =
-            //         ink_env::call::FromAccountId::from_account_id(self.address_registry);
-
-            //     let marketplace_instance: PriceSeed = ink_env::call::FromAccountId::from_account_id(
-            //         address_registry_instance.marketplace(),
-            //     );
-
-            //     unit_price = marketplace_instance.get_price(pay_token);
-            // }
-            unit_price
+            #[cfg(not(test))]
+            {
+                ensure!(
+                    AccountId::from([0x0; 32]) != self.address_registry,
+                    Error::InvalidPayToken
+                );
+                let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
+                    ink_env::call::FromAccountId::from_account_id(self.address_registry);
+                unit_price = self.marketplace_get_price(address_registry_instance.marketplace(),pay_token)?;
+            }
+            Ok(unit_price)
         }
         #[cfg_attr(test, allow(unused_variables))]
         fn valid_owner(
@@ -789,113 +971,97 @@ FailedToSendTheOwnerFeeTransferFailed,
             owner: AccountId,
             quantity: u128,
         ) -> Result<()> {
-            // #[cfg(not(test))]
-            // {
-            //     if self.supports_interface_check(nft_address, INTERFACE_ID_ERC721) {
-            //         use erc721::Erc721;
-            //         let erc721_instance: Erc721 =
-            //             ink_env::call::FromAccountId::from_account_id(nft_address);
-            //         ensure!(
-            //             owner == erc721_instance.owner_of(token_id),
-            //             Error::NotOwningItem
-            //         );
-            //     } else if self.supports_interface_check(nft_address, INTERFACE_ID_ERC1155) {
-            //         use erc1155::Erc1155;
-            //         let erc1155_instance: Erc1155 =
-            //             ink_env::call::FromAccountId::from_account_id(self.address_registry);
-
-            //         ensure!(
-            //             quantity <= erc1155_instance.balance_of(owner, token_id),
-            //             Error::NotOwningItem
-            //         );
-            //     } else {
-            //         ensure!(false, Error::InvalidNFTAddress);
-            //     }
-            // }
+            #[cfg(not(test))]
+            {
+                if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
+                       ensure!(
+                    Some(self.env().caller()) == self.erc721_owner_of(nft_address,token_id)?,
+                    Error::NotOwningItem
+                );
+                } else if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155) {
+     ensure!(
+                    quantity <= self.erc1155_balance_of(nft_address,owner)?,
+                    Error::NotOwningItem
+                );
+                   
+                } else {
+                    ensure!(false, Error::InvalidNFTAddress);
+                }
+            }
             Ok(())
+        }
+ fn erc1155_balance_of(
+            &self,
+            token: AccountId,
+            owner: AccountId,
+        ) -> Result<Balance> {
+            let mut ans = Balance::default();
+            #[cfg(not(test))]
+            {
+                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                let selector: [u8; 4] = [0x16, 0x4B, 0x9B, 0xA0];//balance_of   
+                let (gas_limit,transferred_value)=(0,0);
+                let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
+                .call_type(
+                    Call::new()
+                        .callee(token)
+                        .gas_limit(gas_limit)
+                        .transferred_value(transferred_value),
+                )
+                .exec_input(
+                    ExecutionInput::new(selector.into()).push_arg(owner),
+                )
+                .returns::<Balance>()
+                .fire()
+                .map_err(|_| Error::TransactionFailed);
+                ans=result?;
+            }
+            Ok(ans)
         }
         #[cfg_attr(test, allow(unused_variables))]
         fn valid_pay_token(&self, pay_token: AccountId) -> Result<()> {
             if AccountId::from([0x0; 32]) != pay_token {
-                // #[cfg(not(test))]
-                // {
-                //     use address_registry::AddressRegistry;
-                //     let address_registry_instance: AddressRegistry =
-                //         ink_env::call::FromAccountId::from_account_id(self.address_registry);
-                //     ensure!(
-                //         AccountId::from([0x0; 32]) != address_registry_instance.token_registry(),
-                //         Error::InvalidPayToken
-                //     );
-                //     let token_registry_instance: TokenRegistry =
-                //         ink_env::call::FromAccountId::from_account_id(
-                //             address_registry_instance.token_registry(),
-                //         );
-                //     ensure!(
-                //         token_registry_instance.enabled(pay_token),
-                //         Error::InvalidPayToken,
-                //     );
-                // }
+                #[cfg(not(test))]
+                {
+                    let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
+                        ink_env::call::FromAccountId::from_account_id(self.address_registry);
+                    ensure!(
+                        AccountId::from([0x0; 32]) != address_registry_instance.token_registry(),
+                        Error::InvalidPayToken
+                    );
+                     ensure!(
+                        self.token_registry_enabled( address_registry_instance.token_registry(),pay_token).unwrap_or(false),
+                        Error::InvalidPayToken,
+                    );
+                }
             }
             Ok(())
         }
         #[cfg_attr(test, allow(unused_variables))]
-        fn supports_interface_check(&self, callee: AccountId, data: Vec<u8>) -> bool {
+        fn supports_interface_check(&self, callee: AccountId, data: [u8;4]) -> bool {
             // This is disabled during tests due to the use of `invoke_contract()` not being
             // supported (tests end up panicking).
             let mut ans = false;
-            // #[cfg(not(test))]
-            // {
-            //     use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-            //     let supports_interface_selector: [u8; 4] = [0xF2, 0x3A, 0x6E, 0x61];
-            //     // If our recipient is a smart contract we need to see if they accept or
-            //     // reject this transfer. If they reject it we need to revert the call.
-            //     let params = build_call::<Environment>()
-            //         .call_type(Call::new().callee(callee).gas_limit(5000))
-            //         .exec_input(
-            //             ExecutionInput::new(Selector::new(supports_interface_selector))
-            //                 .push_arg(data),
-            //         )
-            //         .returns::<Vec<u8>>()
-            //         .params();
-
-            //     match ink_env::invoke_contract(&params) {
-            //         Ok(v) => {
-            //             ink_env::debug_println!(
-            //                 "Received return value \"{:?}\" from contract {:?}",
-            //                 v,
-            //                 data
-            //             );
-            //             ans = v == &data[..];
-            //             // assert_eq!(
-            //             //     v,
-            //             //     &ON_ERC_1155_RECEIVED_SELECTOR[..],
-            //             //     "The recipient contract at {:?} does not accept token transfers.\n
-            //             //     Expected: {:?}, Got {:?}",
-            //             //     to,
-            //             //     ON_ERC_1155_RECEIVED_SELECTOR,
-            //             //     v
-            //             // )
-            //         }
-            //         Err(e) => {
-            //             match e {
-            //                 ink_env::Error::CodeNotFound | ink_env::Error::NotCallable => {
-            //                     // Our recipient wasn't a smart contract, so there's nothing more for
-            //                     // us to do
-            //                     ink_env::debug_println!(
-            //                         "Recipient at {:?} from is not a smart contract ({:?})",
-            //                        callee,
-            //                         e
-            //                     );
-            //                 }
-            //                 _ => {
-            //                     // We got some sort of error from the call to our recipient smart
-            //                     // contract, and as such we must revert this call
-            //                     // panic!("Got error \"{:?}\" while trying to call {:?}", e, from)
-            //                 }
-            //             }
-            //         }
-            //     }
-            // }
+            #[cfg(not(test))]
+            {
+                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C];
+                let (gas_limit,transferred_value)=(0,0);
+                let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
+                .call_type(
+                    Call::new()
+                        .callee(callee)
+                        .gas_limit(gas_limit)
+                        .transferred_value(transferred_value),
+                )
+                .exec_input(
+                    ExecutionInput::new(selector.into()).push_arg(data),
+                )
+                .returns::<bool>()
+                .fire()
+                .map_err(|_| Error::TransactionFailed);
+                ans=result.unwrap_or(false);
+            }
             ans
         }
 
@@ -951,18 +1117,17 @@ FailedToSendTheOwnerFeeTransferFailed,
             quantity: u128,
         ) -> Result<()> {
             //onlyContract
-            // #[cfg(not(test))]
-            // {
-            //     use address_registry::AddressRegistry;
-            //     let address_registry_instance: AddressRegistry =
-            //         ink_env::call::FromAccountId::from_account_id(self.address_registry);
+            #[cfg(not(test))]
+            {
+                let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
+                    ink_env::call::FromAccountId::from_account_id(self.address_registry);
 
-            //     ensure!(
-            //         self.env().caller() == address_registry_instance.auction()
-            //             || self.env().caller() == address_registry_instance.marketplace(),
-            //         Error::SenderMustBeAuctionOrMarketplace
-            //     );
-            // }
+                ensure!(
+                    self.env().caller() == address_registry_instance.auction()
+                        || self.env().caller() == address_registry_instance.marketplace(),
+                    Error::SenderMustBeBundleMarketplace
+                );
+            }
             let items = self.bundle_ids_per_item.get(&(nft_address, token_id)).unwrap();
             for _bundle_id in &items {
                 let owner = self.owners.get(&_bundle_id).unwrap();

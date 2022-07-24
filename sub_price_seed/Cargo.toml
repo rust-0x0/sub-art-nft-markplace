@@ -16,7 +16,6 @@ ink_prelude = { version = "3.0.0",  default-features = false }
 scale = { package = "parity-scale-codec", version = "3", default-features = false, features = ["derive"] }
 scale-info = { version = "2", default-features = false, features = ["derive"], optional = true }
 sub_address_registry= { version = "3.0.0", path = "../sub_address_registry", default-features = false, features = ["ink-as-dependency"] }
-sub_token_registry = { version = "3.0.0", path = "../sub_token_registry", default-features = false, features = ["ink-as-dependency"] }
 [lib]
 name = "sub_price_seed"
 path = "lib.rs"
@@ -33,7 +32,6 @@ std = [
     "scale/std",
     "scale-info/std",
     "sub_address_registry/std",
-    "sub_token_registry/std",
 ]
 ink-as-dependency = []
 [profile.release]

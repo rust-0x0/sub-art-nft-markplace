@@ -52,7 +52,7 @@ pub mod sub_address_registry {
         /// @notice TokenRegistry contract
         token_registry: AccountId,
         /// @notice PriceFeed contract
-        price_feed: AccountId,
+        price_seed: AccountId,
         /// contract owner
         owner: AccountId,
     }
@@ -66,91 +66,6 @@ NotERC721,
     // The SubAddressRegistry result types.
     pub type Result<T> = core::result::Result<T, Error>;
 
-/// Event emitted when a token ItemListed occurs.
-    #[ink(event)]
-    pub struct ItemListed {
-        #[ink(topic)]
-        pub owner: AccountId,
-        #[ink(topic)]
-        pub nft_address: AccountId,
-        pub token_id: TokenId,
-        pub quantity: u128,
-        pub pay_token: AccountId,
-        pub price_per_item: Balance,
-        pub starting_time: u128,
-    }
-
-    /// Event emitted when an operator is enabled or disabled for an owner.
-    /// The operator can manage all NFTs of the owner.
-    #[ink(event)]
-    pub struct ItemSold {
-        #[ink(topic)]
-        pub seller: AccountId,
-        #[ink(topic)]
-        pub buyer: AccountId,
-        #[ink(topic)]
-        pub nft_address: AccountId,
-        pub token_id: TokenId,
-        pub quantity: u128,
-        pub pay_token: AccountId,
-        pub unit_price: Balance,
-        pub price_per_item: Balance,
-    }
-
-    /// Event emitted when a token ItemUpdated occurs.
-    #[ink(event)]
-    pub struct ItemUpdated {
-        #[ink(topic)]
-        pub owner: AccountId,
-        #[ink(topic)]
-        pub nft_address: AccountId,
-        pub token_id: TokenId,
-        pub pay_token: AccountId,
-        pub new_price: Balance,
-    }
-
-    #[ink(event)]
-    pub struct ItemCanceled {
-        #[ink(topic)]
-        pub owner: AccountId,
-        #[ink(topic)]
-        pub nft_address: AccountId,
-        pub token_id: TokenId,
-    }
-
-    /// Event emitted when a token OfferCreated occurs.
-    #[ink(event)]
-    pub struct OfferCreated {
-        #[ink(topic)]
-        pub creator: AccountId,
-        #[ink(topic)]
-        pub nft_address: AccountId,
-        pub token_id: TokenId,
-        pub quantity: u128,
-        pub pay_token: AccountId,
-        pub price_per_item: Balance,
-        pub deadline: u128,
-    }
-    /// Event emitted when a token OfferCanceled occurs.
-    #[ink(event)]
-    pub struct OfferCanceled {
-        #[ink(topic)]
-        pub creator: AccountId,
-        #[ink(topic)]
-        pub nft_address: AccountId,
-        pub token_id: TokenId,
-    }
-
-    /// Event emitted when a token UpdatePlatformFee occurs.
-    #[ink(event)]
-    pub struct UpdatePlatformFee {
-        pub platform_fee: Balance,
-    }
-    /// Event emitted when a token UpdatePlatformFeeRecipient occurs.
-    #[ink(event)]
-    pub struct UpdatePlatformFeeRecipient {
-        pub fee_recipient: AccountId,
-    }
 
     impl SubAddressRegistry {
         /// Creates a new ERC-721 token contract.
@@ -339,10 +254,10 @@ NotERC721,
         @dev Only admin
         */
         #[ink(message)]
-        pub fn update_price_feed(&mut self, price_feed: AccountId) -> Result<()> {
+        pub fn update_price_seed(&mut self, price_seed: AccountId) -> Result<()> {
             //onlyOwner
             ensure!(self.env().caller() == self.owner, Error::OnlyOwner);
-            self.price_feed = price_feed;
+            self.price_seed = price_seed;
             Ok(())
         }
         #[ink(message)]
@@ -419,8 +334,8 @@ NotERC721,
         @dev Only admin
         */
         #[ink(message)]
-        pub fn price_feed(&self)->AccountId {
-            self.price_feed
+        pub fn price_seed(&self)->AccountId {
+            self.price_seed
         }
     }
 

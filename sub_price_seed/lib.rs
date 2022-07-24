@@ -43,21 +43,9 @@ mod sub_price_seed {
 OracleAlreadySet,
 InvalidPayToken,
 OracleNotSet,
+TransactionFailed,
     }
-
-    // The SubPriceSeed result types.
     pub type Result<T> = core::result::Result<T, Error>;
-  /// Event emitted when a token TokenAdded occurs.
-    #[ink(event)]
-    pub struct TokenAdded {
-        token: AccountId,
-    }
-    /// Event emitted when a token TokenRemoved occurs.
-    #[ink(event)]
-    pub struct TokenRemoved {
-        token: AccountId,
-    }
-
     impl SubPriceSeed {
         /// Creates a new token contract.
         #[ink(constructor)]
@@ -101,16 +89,37 @@ OracleNotSet,
                     AccountId::from([0x0; 32]) == address_registry_instance.token_registry(),
                     Error::InvalidPayToken
                 );
-                let token_registry_instance: sub_token_registry::SubTokenRegistryRef =
-                    ink_env::call::FromAccountId::from_account_id(
-                        address_registry_instance.token_registry(),
-                    );
                 ensure!(
-                    token_registry_instance.enabled(token),
+                    self.token_registry_enabled(address_registry_instance.token_registry(),token).is_ok(),
                     Error::InvalidPayToken,
                 );
             }
             Ok(())
+        }
+        #[cfg_attr(test, allow(unused_variables))]
+        fn token_registry_enabled(&self, callee: AccountId,token: AccountId) -> Result<bool> {
+            let mut ans = false;
+            #[cfg(not(test))]
+            {
+                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C];//0x1414631c enabled 
+                let (gas_limit,transferred_value)=(0,0);
+                let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
+                .call_type(
+                    Call::new()
+                        .callee(callee)
+                        .gas_limit(gas_limit)
+                        .transferred_value(transferred_value),
+                )
+                .exec_input(
+                    ExecutionInput::new(selector.into()).push_arg(token),
+                )
+                .returns::<bool>()
+                .fire()
+                .map_err(|_| Error::TransactionFailed);
+                ans=result?;
+            }
+            Ok(ans)
         }
     /**
      @notice Update oracle address for token
