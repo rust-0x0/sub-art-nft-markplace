@@ -4,7 +4,7 @@
 //!
 
 #![cfg_attr(not(feature = "std"), no_std)]
-pub use self::sub_address_registry::{SubAddressRegistry,SubAddressRegistryRef};
+pub use self::sub_address_registry::{SubAddressRegistry, SubAddressRegistryRef};
 
 #[cfg_attr(test, allow(dead_code))]
 const INTERFACE_ID_ERC721: [u8; 4] = [0x80, 0xAC, 0x58, 0xCD];
@@ -23,7 +23,7 @@ pub mod sub_address_registry {
 
     use ink_lang as ink;
     use ink_prelude::string::String;
-     use ink_prelude::vec::Vec;
+    use ink_prelude::vec::Vec;
     use ink_storage::{
         traits::{PackedLayout, SpreadAllocate, SpreadLayout},
         Mapping,
@@ -60,12 +60,12 @@ pub mod sub_address_registry {
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum Error {
         OnlyOwner,
-NotERC721,
+        NotERC721,
+TransactionFailed,
     }
 
     // The SubAddressRegistry result types.
     pub type Result<T> = core::result::Result<T, Error>;
-
 
     impl SubAddressRegistry {
         /// Creates a new ERC-721 token contract.
@@ -91,68 +91,36 @@ NotERC721,
             //             "Not ERC721"
             //         );
             use crate::INTERFACE_ID_ERC721;
-            ensure!(self.supports_interface_check(artion,INTERFACE_ID_ERC721), Error::NotERC721);
+            ensure!(
+                self.supports_interface_check(artion, INTERFACE_ID_ERC721),
+                Error::NotERC721
+            );
             self.artion = artion;
 
             Ok(())
         }
         #[cfg_attr(test, allow(unused_variables))]
-        fn supports_interface_check(&self, callee: AccountId, data: [u8;4]) -> bool {
+        fn supports_interface_check(&self, callee: AccountId, data: [u8; 4]) -> bool {
             // This is disabled during tests due to the use of `invoke_contract()` not being
             // supported (tests end up panicking).
             let mut ans = false;
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let supports_interface_selector: [u8; 4] = [0xF2, 0x3A, 0x6E, 0x61];
-                // If our recipient is a smnft contract we need to see if they accept or
-                // reject this transfer. If they reject it we need to revert the call.
-                let params = build_call::<Environment>()
-                    .call_type(Call::new().callee(callee).gas_limit(5000))
-                    .exec_input(
-                        ExecutionInput::new(Selector::new(supports_interface_selector))
-                            .push_arg(data),
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C];//supports_interface
+                let (gas_limit, transferred_value) = (0, 0);
+                let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
+                    .call_type(
+                        Call::new()
+                            .callee(callee)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
                     )
-                    .returns::<Vec<u8>>()
-                    .params();
-
-                match ink_env::invoke_contract(&params) {
-                    Ok(v) => {
-                        ink_env::debug_println!(
-                            "Received return value \"{:?}\" from contract {:?}",
-                            v,
-                            data
-                        );
-                        ans = v == &data[..];
-                        // assert_eq!(
-                        //     v,
-                        //     &ON_ERC_721_RECEIVED_SELECTOR[..],
-                        //     "The recipient contract at {:?} does not accept token transfers.\n
-                        //     Expected: {:?}, Got {:?}",
-                        //     to,
-                        //     ON_ERC_721_RECEIVED_SELECTOR,
-                        //     v
-                        // )
-                    }
-                    Err(e) => {
-                        match e {
-                            ink_env::Error::CodeNotFound | ink_env::Error::NotCallable => {
-                                // Our recipient wasn't a smnft contract, so there's nothing more for
-                                // us to do
-                                ink_env::debug_println!(
-                                    "Recipient at {:?} from is not a smnft contract ({:?})",
-                                    callee,
-                                    e
-                                );
-                            }
-                            _ => {
-                                // We got some sort of error from the call to our recipient smnft
-                                // contract, and as such we must revert this call
-                                // panic!("Got error \"{:?}\" while trying to call {:?}", e, from)
-                            }
-                        }
-                    }
-                }
+                    .exec_input(ExecutionInput::new(selector.into()).push_arg(data))
+                    .returns::<bool>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ans = result.unwrap_or(false);
             }
             ans
         }
@@ -261,20 +229,19 @@ NotERC721,
             Ok(())
         }
         #[ink(message)]
-        pub fn artion(& self ) -> AccountId {
-
-            self.artion 
+        pub fn artion(&self) -> AccountId {
+            self.artion
         }
-  #[ink(message)]
-        pub fn auction(&self)->AccountId {
-            self.auction 
+        #[ink(message)]
+        pub fn auction(&self) -> AccountId {
+            self.auction
         }
         /**
         @notice Update Marketplace contract
         @dev Only admin
         */
         #[ink(message)]
-        pub fn marketplace(&self)->AccountId {
+        pub fn marketplace(&self) -> AccountId {
             self.marketplace
         }
 
@@ -283,8 +250,8 @@ NotERC721,
         @dev Only admin
         */
         #[ink(message)]
-        pub fn bundle_marketplace(&self)->AccountId {
-            self.bundle_marketplace 
+        pub fn bundle_marketplace(&self) -> AccountId {
+            self.bundle_marketplace
         }
 
         /**
@@ -292,8 +259,8 @@ NotERC721,
         @dev Only admin
         */
         #[ink(message)]
-        pub fn nft_factory(&self)->AccountId {
-            self.factory 
+        pub fn nft_factory(&self) -> AccountId {
+            self.factory
         }
 
         /**
@@ -301,16 +268,16 @@ NotERC721,
         @dev Only admin
         */
         #[ink(message)]
-        pub fn nft_factory_private(&self)->AccountId {
-            self.private_factory 
+        pub fn nft_factory_private(&self) -> AccountId {
+            self.private_factory
         }
         /**
         @notice Update ArtFactory contract
         @dev Only admin
         */
         #[ink(message)]
-        pub fn art_factory(&self)->AccountId {
-            self.art_factory 
+        pub fn art_factory(&self) -> AccountId {
+            self.art_factory
         }
 
         /**
@@ -318,23 +285,23 @@ NotERC721,
         @dev Only admin
         */
         #[ink(message)]
-        pub fn art_factory_private(&self)->AccountId {
-            self.private_art_factory 
+        pub fn art_factory_private(&self) -> AccountId {
+            self.private_art_factory
         }
         /**
         @notice Update token registry contract
         @dev Only admin
         */
         #[ink(message)]
-        pub fn token_registry(&self)->AccountId {
-            self.token_registry 
+        pub fn token_registry(&self) -> AccountId {
+            self.token_registry
         }
         /**
         @notice Update price feed contract
         @dev Only admin
         */
         #[ink(message)]
-        pub fn price_seed(&self)->AccountId {
+        pub fn price_seed(&self) -> AccountId {
             self.price_seed
         }
     }

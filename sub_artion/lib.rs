@@ -18,6 +18,9 @@ macro_rules! ensure {
 }
 #[ink::contract]
 mod sub_artion {
+    #[cfg_attr(test, allow(dead_code))]
+    const INTERFACE_ID_ERC721: [u8; 4] = [0x80, 0xAC, 0x58, 0xCD];
+
     use ink_lang as ink;
     use ink_prelude::string::String;
     use ink_storage::{traits::SpreadAllocate, Mapping};
@@ -186,6 +189,10 @@ mod sub_artion {
             })
         }
 
+        #[ink(message)]
+        pub fn supports_interface(&self, interface_id: [u8; 4]) -> bool {
+            INTERFACE_ID_ERC721 == interface_id
+        }
         /// Creates a new token.
         #[ink(message, payable)]
         pub fn mint_with_owner_and_uri(

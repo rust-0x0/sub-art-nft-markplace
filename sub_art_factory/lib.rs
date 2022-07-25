@@ -4,8 +4,7 @@
 //!
 
 #![cfg_attr(not(feature = "std"), no_std)]
-pub use self::sub_art_factory::{SubArtFactory,SubArtFactoryRef};
-
+pub use self::sub_art_factory::{SubArtFactory, SubArtFactoryRef};
 
 #[cfg_attr(test, allow(dead_code))]
 const INTERFACE_ID_ERC1155: [u8; 4] = [0xD9, 0xB6, 0x7A, 0x26];
@@ -20,15 +19,15 @@ macro_rules! ensure {
 #[ink::contract]
 mod sub_art_factory {
     use ink_lang as ink;
- use ink_prelude::vec::Vec;
+    use ink_lang::codegen::EmitEvent;
     use ink_prelude::string::String;
+    use ink_prelude::vec::Vec;
     use ink_storage::{
         traits::{PackedLayout, SpreadAllocate, SpreadLayout},
         Mapping,
     };
-    use sub_art_tradable::sub_art_tradable::{ContractCreated,ContractDisabled};
- use ink_lang::codegen::EmitEvent;
     use scale::{Decode, Encode};
+    use sub_art_tradable::sub_art_tradable::{ContractCreated, ContractDisabled};
 
     #[ink(storage)]
     #[derive(Default, SpreadAllocate)]
@@ -44,7 +43,7 @@ mod sub_art_factory {
         /// # note Platform fee receipient
         fee_recipient: AccountId,
         exists: Mapping<AccountId, bool>,
-        code_hash:Hash,
+        code_hash: Hash,
         /// contract owner
         owner: AccountId,
     }
@@ -52,15 +51,14 @@ mod sub_art_factory {
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum Error {
         OnlyOwner,
-InsufficientFunds,
-TransferFailed,
-TransferOwnershipFailed,
-ArtContractAlreadyRegistered,
-NotAnERC1155Contract,
-ArtContractIsNotRegistered,
+        InsufficientFunds,
+        TransferFailed,
+        TransferOwnershipFailed,
+        ArtContractAlreadyRegistered,
+        NotAnERC1155Contract,
+        ArtContractIsNotRegistered,
     }
 
- 
     // The SubArtFactory result types.
     pub type Result<T> = core::result::Result<T, Error>;
 
@@ -80,7 +78,7 @@ ArtContractIsNotRegistered,
             ink_lang::utils::initialize_contract(|contract: &mut Self| {
                 contract.owner = Self::env().caller();
                 contract.marketplace = marketplace;
-                contract.bundle_marketplace= bundle_marketplace;
+                contract.bundle_marketplace = bundle_marketplace;
                 contract.mint_fee = mint_fee;
                 contract.fee_recipient = fee_recipient;
                 contract.platform_fee = platform_fee;
@@ -88,7 +86,6 @@ ArtContractIsNotRegistered,
             })
         }
 
-       
         /**
         @notice Update Marketplace contract
         @dev Only admin
@@ -149,7 +146,7 @@ ArtContractIsNotRegistered,
         /// @param _name Name of NFT contract
         /// @param _symbol Symbol of NFT contract
         #[ink(message, payable)]
-        pub fn create_nft_contract(&mut self, name:String,symbol :String) -> Result<AccountId> {
+        pub fn create_nft_contract(&mut self, name: String, symbol: String) -> Result<AccountId> {
             ensure!(
                 self.env().transferred_value() >= self.platform_fee,
                 Error::InsufficientFunds
@@ -165,13 +162,20 @@ ArtContractIsNotRegistered,
             {
                 use sub_art_tradable::SubArtTradableRef;
                 let total_balance = Self::env().balance();
-                let version:u32=1;
+                let version: u32 = 1;
                 let salt = version.to_le_bytes();
-                let instance_params = SubArtTradableRef::new(name,symbol,self.marketplace,self.bundle_marketplace,self.mint_fee,self.fee_recipient)
-                    .endowment(total_balance / 4)
-                    .code_hash(self.code_hash)
-                    .salt_bytes(salt)
-                    .params();
+                let instance_params = SubArtTradableRef::new(
+                    name,
+                    symbol,
+                    self.marketplace,
+                    self.bundle_marketplace,
+                    self.mint_fee,
+                    self.fee_recipient,
+                )
+                .endowment(total_balance / 4)
+                .code_hash(self.code_hash)
+                .salt_bytes(salt)
+                .params();
                 let init_result = ink_env::instantiate_contract(&instance_params);
                 let contract_addr =
                     init_result.expect("failed at instantiating the `Erc1155` contract");
@@ -211,8 +215,8 @@ ArtContractIsNotRegistered,
             });
             Ok(())
         }
-   /// @notice Method for disabling existing SubArtTradable contract
-    /// @param  tokenContractAddress Address of NFT contract
+        /// @notice Method for disabling existing SubArtTradable contract
+        /// @param  tokenContractAddress Address of NFT contract
         #[ink(message)]
         pub fn disable_token_contract(&mut self, token_contract: AccountId) -> Result<()> {
             ensure!(self.env().caller() == self.owner, Error::OnlyOwner);
@@ -229,67 +233,32 @@ ArtContractIsNotRegistered,
             });
             Ok(())
         }
-   #[ink(message)]
-        pub fn exists(&self,  token: AccountId) -> bool {
+        #[ink(message)]
+        pub fn exists(&self, token: AccountId) -> bool {
             self.exists.get(&token).unwrap_or(false)
         }
-        #[cfg_attr(test, allow(unused_variables))]
-        fn supports_interface_check(&self, callee: AccountId, data: [u8;4]) -> bool {
+         #[cfg_attr(test, allow(unused_variables))]
+        fn supports_interface_check(&self, callee: AccountId, data: [u8; 4]) -> bool {
             // This is disabled during tests due to the use of `invoke_contract()` not being
             // supported (tests end up panicking).
             let mut ans = false;
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let supports_interface_selector: [u8; 4] = [0xF2, 0x3A, 0x6E, 0x61];
-                // If our recipient is a smart contract we need to see if they accept or
-                // reject this transfer. If they reject it we need to revert the call.
-                let params = build_call::<Environment>()
-                    .call_type(Call::new().callee(callee).gas_limit(5000))
-                    .exec_input(
-                        ExecutionInput::new(Selector::new(supports_interface_selector))
-                            .push_arg(data),
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C];//supports_interface
+                let (gas_limit, transferred_value) = (0, 0);
+                let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
+                    .call_type(
+                        Call::new()
+                            .callee(callee)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
                     )
-                    .returns::<Vec<u8>>()
-                    .params();
-
-                match ink_env::invoke_contract(&params) {
-                    Ok(v) => {
-                        ink_env::debug_println!(
-                            "Received return value \"{:?}\" from contract {:?}",
-                            v,
-                            data
-                        );
-                        ans = v == &data[..];
-                        // assert_eq!(
-                        //     v,
-                        //     &ON_ERC_1155_RECEIVED_SELECTOR[..],
-                        //     "The recipient contract at {:?} does not accept token transfers.\n
-                        //     Expected: {:?}, Got {:?}",
-                        //     to,
-                        //     ON_ERC_1155_RECEIVED_SELECTOR,
-                        //     v
-                        // )
-                    }
-                    Err(e) => {
-                        match e {
-                            ink_env::Error::CodeNotFound | ink_env::Error::NotCallable => {
-                                // Our recipient wasn't a smart contract, so there's nothing more for
-                                // us to do
-                                ink_env::debug_println!(
-                                    "Recipient at {:?} from is not a smart contract ({:?})",
-                                    callee,
-                                    e
-                                );
-                            }
-                            _ => {
-                                // We got some sort of error from the call to our recipient smart
-                                // contract, and as such we must revert this call
-                                // panic!("Got error \"{:?}\" while trying to call {:?}", e, from)
-                            }
-                        }
-                    }
-                }
+                    .exec_input(ExecutionInput::new(selector.into()).push_arg(data))
+                    .returns::<bool>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ans = result.unwrap_or(false);
             }
             ans
         }

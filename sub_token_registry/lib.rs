@@ -4,7 +4,7 @@
 //!
 
 #![cfg_attr(not(feature = "std"), no_std)]
-pub use self::sub_token_registry::{SubTokenRegistry,SubTokenRegistryRef};
+pub use self::sub_token_registry::{SubTokenRegistry, SubTokenRegistryRef};
 
 use ink_lang as ink;
 macro_rules! ensure {
@@ -27,7 +27,7 @@ mod sub_token_registry {
     #[ink(storage)]
     #[derive(Default, SpreadAllocate)]
     pub struct SubTokenRegistry {
-          /// ERC20 Address -> Bool
+        /// ERC20 Address -> Bool
         enabled: Mapping<AccountId, bool>,
         /// contract owner
         owner: AccountId,
@@ -36,13 +36,13 @@ mod sub_token_registry {
     #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
     pub enum Error {
         OnlyOwner,
-TokenAlreadyAdded,
-TokenNotExist,
+        TokenAlreadyAdded,
+        TokenNotExist,
     }
 
     // The SubTokenRegistry result types.
     pub type Result<T> = core::result::Result<T, Error>;
-  /// Event emitted when a token TokenAdded occurs.
+    /// Event emitted when a token TokenAdded occurs.
     #[ink(event)]
     pub struct TokenAdded {
         token: AccountId,
@@ -64,41 +64,43 @@ TokenNotExist,
             })
         }
 
-       /**
-  @notice Method for adding payment token
-  @dev Only admin
-  @param token ERC20 token address
-  */
+        /**
+        @notice Method for adding payment token
+        @dev Only admin
+        @param token ERC20 token address
+        */
         #[ink(message)]
         pub fn add(&mut self, token: AccountId) -> Result<()> {
             //onlyOwner
             ensure!(self.env().caller() == self.owner, Error::OnlyOwner);
-            ensure!(!self.enabled.get(&token).unwrap_or(false), Error::TokenAlreadyAdded);
-            self.enabled.insert(&token,&true);
-        self.env().emit_event(TokenAdded {
-                token,
-             });
+            ensure!(
+                !self.enabled.get(&token).unwrap_or(false),
+                Error::TokenAlreadyAdded
+            );
+            self.enabled.insert(&token, &true);
+            self.env().emit_event(TokenAdded { token });
             Ok(())
         }
 
-  /**
-  @notice Method for removing payment token
-  @dev Only admin
-  @param token ERC20 token address
-  */
-     #[ink(message)]
+        /**
+        @notice Method for removing payment token
+        @dev Only admin
+        @param token ERC20 token address
+        */
+        #[ink(message)]
         pub fn remove(&mut self, token: AccountId) -> Result<()> {
             //onlyOwner
             ensure!(self.env().caller() == self.owner, Error::OnlyOwner);
-            ensure!(self.enabled.get(&token).unwrap_or(false), Error::TokenNotExist);
+            ensure!(
+                self.enabled.get(&token).unwrap_or(false),
+                Error::TokenNotExist
+            );
             self.enabled.remove(&token);
-        self.env().emit_event(TokenRemoved {
-                token,
-             });
+            self.env().emit_event(TokenRemoved { token });
             Ok(())
         }
-          #[ink(message)]
-        pub fn enabled(&self,token:AccountId)->bool{
+        #[ink(message)]
+        pub fn enabled(&self, token: AccountId) -> bool {
             self.enabled.get(token).unwrap_or(false)
         }
     }

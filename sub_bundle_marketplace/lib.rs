@@ -3,7 +3,7 @@
 //! This is an ERC-721 Token implementation.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-pub use self::sub_bundle_marketplace::{SubBundleMarketplace,SubBundleMarketplaceRef};
+pub use self::sub_bundle_marketplace::{SubBundleMarketplace, SubBundleMarketplaceRef};
 
 use ink_lang as ink;
 
@@ -25,9 +25,9 @@ macro_rules! ensure {
 #[ink::contract]
 mod sub_bundle_marketplace {
     use ink_lang as ink;
- use ink_prelude::string::String;
+    use ink_prelude::collections::BTreeSet;
+    use ink_prelude::string::String;
     use ink_prelude::vec::Vec;
- use ink_prelude::collections::BTreeSet;
     use ink_storage::{
         traits::{PackedLayout, SpreadAllocate, SpreadLayout},
         Mapping,
@@ -38,7 +38,7 @@ mod sub_bundle_marketplace {
     /// A token ID.
     pub type TokenId = u128;
 
-    #[derive( Default,scale::Encode, scale::Decode, SpreadLayout, PackedLayout)]
+    #[derive(Default, scale::Encode, scale::Decode, SpreadLayout, PackedLayout)]
     #[cfg_attr(
         feature = "std",
         derive(
@@ -58,7 +58,7 @@ mod sub_bundle_marketplace {
         pub starting_time: u128,
     }
 
-    #[derive( Default,scale::Encode, scale::Decode, SpreadLayout, PackedLayout)]
+    #[derive(Default, scale::Encode, scale::Decode, SpreadLayout, PackedLayout)]
     #[cfg_attr(
         feature = "std",
         derive(
@@ -115,13 +115,13 @@ mod sub_bundle_marketplace {
         RoyaltyAlreadySet,
         InvalidCreatorAddress,
         SenderMustBeBundleMarketplace,
-InvalidData,
-InvalidId,
-InsufficientFunds,
-FeeTransferFailed,
-OwnerFeeTransferFailed,
-FailedToSendTheOwnerFeeTransferFailed,
-TransactionFailed,
+        InvalidData,
+        InvalidId,
+        InsufficientFunds,
+        FeeTransferFailed,
+        OwnerFeeTransferFailed,
+        FailedToSendTheOwnerFeeTransferFailed,
+        TransactionFailed,
     }
 
     // The SubBundleMarketplace result types.
@@ -223,7 +223,7 @@ TransactionFailed,
             owner: AccountId,
             bundle_id: String,
         ) -> (Vec<AccountId>, Vec<TokenId>, Vec<u128>, Balance, u128) {
-              let _bundle_id=  self.get_bundle_id(&bundle_id);
+            let _bundle_id = self.get_bundle_id(&bundle_id);
             let listing = self.listings.get(&(owner, _bundle_id)).unwrap();
             (
                 listing.nfts,
@@ -234,28 +234,26 @@ TransactionFailed,
             )
         }
 
- #[cfg_attr(test, allow(unused_variables))]
-        fn token_registry_enabled(&self, callee: AccountId,token: AccountId) -> Result<bool> {
+        #[cfg_attr(test, allow(unused_variables))]
+        fn token_registry_enabled(&self, callee: AccountId, token: AccountId) -> Result<bool> {
             let mut ans = false;
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C];//0x1414631c enabled 
-                let (gas_limit,transferred_value)=(0,0);
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C]; //0x1414631c enabled
+                let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(callee)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(token),
-                )
-                .returns::<bool>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
-                ans=result?;
+                    .call_type(
+                        Call::new()
+                            .callee(callee)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(ExecutionInput::new(selector.into()).push_arg(token))
+                    .returns::<bool>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ans = result?;
             }
             Ok(ans)
         }
@@ -270,10 +268,10 @@ TransactionFailed,
         #[cfg_attr(test, allow(unused_variables))]
         pub fn list_item(
             &mut self,
-            bundle_id:String,
+            bundle_id: String,
             nft_addresses: Vec<AccountId>,
             token_ids: Vec<TokenId>,
-            quantities:Vec<u128>,
+            quantities: Vec<u128>,
             pay_token: AccountId,
             price: Balance,
             starting_time: u128,
@@ -311,7 +309,11 @@ TransactionFailed,
                         Error::InvalidPayToken
                     );
                     ensure!(
-                        self.token_registry_enabled( address_registry_instance.token_registry(),pay_token).unwrap_or(false),
+                        self.token_registry_enabled(
+                            address_registry_instance.token_registry(),
+                            pay_token
+                        )
+                        .unwrap_or(false),
                         Error::InvalidPayToken,
                     );
                 }
@@ -326,24 +328,38 @@ TransactionFailed,
                 #[cfg(not(test))]
                 {
                     if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
-                      ensure!(
-                    Some(self.env().caller()) == self.erc721_owner_of(nft_address,token_id)?,
-                    Error::NotOwningItem
-                );
-               ensure!(
-                    self.erc721_is_approved_for_all(nft_address,self.env().caller(), self.env().account_id()).unwrap_or(false),
-                    Error::ItemNotApproved
-                );
+                        ensure!(
+                            Some(self.env().caller())
+                                == self.erc721_owner_of(nft_address, token_id)?,
+                            Error::NotOwningItem
+                        );
+                        ensure!(
+                            self.erc721_is_approved_for_all(
+                                nft_address,
+                                self.env().caller(),
+                                self.env().account_id()
+                            )
+                            .unwrap_or(false),
+                            Error::ItemNotApproved
+                        );
                         listing.quantities.push(1);
-                    } else if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155) {
-                            ensure!(
-                    quantity <= self.erc1155_balance_of(nft_address,self.env().caller())?,
-                    Error::MustHoldEnoughNFTs
-                );
-         ensure!(
-                    self.erc1155_is_approved_for_all(nft_address,self.env().caller(), self.env().account_id()).is_ok(),
-                    Error::ItemNotApproved
-                );
+                    } else if self
+                        .supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155)
+                    {
+                        ensure!(
+                            quantity
+                                <= self.erc1155_balance_of(nft_address, self.env().caller())?,
+                            Error::MustHoldEnoughNFTs
+                        );
+                        ensure!(
+                            self.erc1155_is_approved_for_all(
+                                nft_address,
+                                self.env().caller(),
+                                self.env().account_id()
+                            )
+                            .is_ok(),
+                            Error::ItemNotApproved
+                        );
                     } else {
                         ensure!(false, Error::InvalidNFTAddress);
                     }
@@ -363,7 +379,8 @@ TransactionFailed,
             listing.pay_token = pay_token;
             listing.price = price;
             listing.starting_time = starting_time;
-            self.listings.insert(&(self.env().caller(), _bundle_id.clone()), &listing);
+            self.listings
+                .insert(&(self.env().caller(), _bundle_id.clone()), &listing);
             self.owners.insert(&_bundle_id, &self.env().caller());
 
             self.env().emit_event(ItemListed {
@@ -439,9 +456,9 @@ TransactionFailed,
             self.env().emit_event(ItemUpdated {
                 owner: self.env().caller(),
                 bundle_id,
-                nft:listing.nfts,
-                token_id:listing.token_ids,
-                quantity:listing.quantities,
+                nft: listing.nfts,
+                token_id: listing.token_ids,
+                quantity: listing.quantities,
                 pay_token,
                 new_price,
             });
@@ -475,20 +492,28 @@ TransactionFailed,
 
                 #[cfg(not(test))]
                 {
-                    if self.supports_interface_check(nft_address,  crate::INTERFACE_ID_ERC721) {
-  ensure!(
-                    Some(self.env().caller()) == self.erc721_owner_of(nft_address,token_id)?,
-                    Error::NotOwningItem
-                );
-               ensure!(
-                    self.erc721_is_approved_for_all(nft_address,self.env().caller(), self.env().account_id()).unwrap_or(false),
-                    Error::ItemNotApproved
-                );
-                     } else if self.supports_interface_check(nft_address,  crate::INTERFACE_ID_ERC1155) {
-                                    ensure!(
-                    quantity <= self.erc1155_balance_of(nft_address,owner)?,
-                    Error::MustHoldEnoughNFTs
-                );
+                    if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
+                        ensure!(
+                            Some(self.env().caller())
+                                == self.erc721_owner_of(nft_address, token_id)?,
+                            Error::NotOwningItem
+                        );
+                        ensure!(
+                            self.erc721_is_approved_for_all(
+                                nft_address,
+                                self.env().caller(),
+                                self.env().account_id()
+                            )
+                            .unwrap_or(false),
+                            Error::ItemNotApproved
+                        );
+                    } else if self
+                        .supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155)
+                    {
+                        ensure!(
+                            quantity <= self.erc1155_balance_of(nft_address, owner)?,
+                            Error::MustHoldEnoughNFTs
+                        );
                     } else {
                         ensure!(false, Error::InvalidNFTAddress);
                     }
@@ -514,20 +539,26 @@ TransactionFailed,
                     Error::OwnerFeeTransferFailed
                 );
             } else {
-                            ensure!(
-                         self.erc20_transfer_from(
-                pay_token,
-                self.env().caller(),
-                self.fee_recipient,
-                fee_amount,
-            ).is_ok(),
-                        Error::FailedToSendTheOwnerFeeTransferFailed
-                    );
-                    ensure!(
-                       self.erc20_transfer_from(pay_token, self.env().caller(), owner, price - fee_amount)
-                            .is_ok(),
-                        Error::FailedToSendTheOwnerFeeTransferFailed
-                    );
+                ensure!(
+                    self.erc20_transfer_from(
+                        pay_token,
+                        self.env().caller(),
+                        self.fee_recipient,
+                        fee_amount,
+                    )
+                    .is_ok(),
+                    Error::FailedToSendTheOwnerFeeTransferFailed
+                );
+                ensure!(
+                    self.erc20_transfer_from(
+                        pay_token,
+                        self.env().caller(),
+                        owner,
+                        price - fee_amount
+                    )
+                    .is_ok(),
+                    Error::FailedToSendTheOwnerFeeTransferFailed
+                );
             }
 
             for (i, &nft_address) in listing.nfts.iter().enumerate() {
@@ -537,18 +568,29 @@ TransactionFailed,
                 #[cfg(not(test))]
                 {
                     if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
-                self.erc721_transfer_from(nft_address, owner, self.env().caller(), token_id)?;
-                    } else if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155) {
-                           self.erc1155_transfer_from(
-                    nft_address,
-                    owner,
-                    self.env().caller(),
-                    token_id,
-                    quantity,
-                )?;
+                        self.erc721_transfer_from(
+                            nft_address,
+                            owner,
+                            self.env().caller(),
+                            token_id,
+                        )?;
+                    } else if self
+                        .supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155)
+                    {
+                        self.erc1155_transfer_from(
+                            nft_address,
+                            owner,
+                            self.env().caller(),
+                            token_id,
+                            quantity,
+                        )?;
                     }
-            self.marketplace_validate_item_sold(nft_address, token_id,      owner,
-                        self.env().caller(),)?;
+                    self.marketplace_validate_item_sold(
+                        nft_address,
+                        token_id,
+                        owner,
+                        self.env().caller(),
+                    )?;
                 }
             }
             self.listings.remove(&(owner, _bundle_id.clone()));
@@ -560,7 +602,7 @@ TransactionFailed,
             self.env().emit_event(ItemSold {
                 seller: owner,
                 buyer: self.env().caller(),
-                bundle_id:bundle_id.clone(),
+                bundle_id: bundle_id.clone(),
                 pay_token,
                 unit_price: self.get_price(pay_token)?,
                 price,
@@ -571,11 +613,11 @@ TransactionFailed,
             });
             Ok(())
         }
-fn marketplace_validate_item_sold(
+        fn marketplace_validate_item_sold(
             &self,
             nft_address: AccountId,
             token_id: TokenId,
-                     seller: AccountId,
+            seller: AccountId,
             buyer: AccountId,
         ) -> Result<()> {
             #[cfg(not(test))]
@@ -587,41 +629,51 @@ fn marketplace_validate_item_sold(
                     AccountId::from([0x0; 32]) == address_registry_instance.marketplace(),
                     Error::InvalidPayToken
                 );
-                self._marketplace_validate_item_sold(address_registry_instance.marketplace(),nft_address, token_id, seller,buyer)?;
+                self._marketplace_validate_item_sold(
+                    address_registry_instance.marketplace(),
+                    nft_address,
+                    token_id,
+                    seller,
+                    buyer,
+                )?;
             }
             Ok(())
         }
-        fn  _marketplace_validate_item_sold(
+        fn _marketplace_validate_item_sold(
             &self,
             token: AccountId,
             nft_address: AccountId,
-            token_id:TokenId,
-                      seller: AccountId,
+            token_id: TokenId,
+            seller: AccountId,
             buyer: AccountId,
         ) -> Result<()> {
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E];//owner_of  
-                let (gas_limit,transferred_value)=(0,0);
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //owner_of
+                let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(nft_address).push_arg(token_id).push_arg(seller).push_arg(buyer),
-                )
-                .returns::<(AccountId,Balance)>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
-                ensure!(result.is_ok(),Error::TransactionFailed);
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(
+                        ExecutionInput::new(selector.into())
+                            .push_arg(nft_address)
+                            .push_arg(token_id)
+                            .push_arg(seller)
+                            .push_arg(buyer),
+                    )
+                    .returns::<(AccountId, Balance)>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ensure!(result.is_ok(), Error::TransactionFailed);
             }
             Ok(())
         }
-fn erc1155_is_approved_for_all(
+        fn erc1155_is_approved_for_all(
             &self,
             token: AccountId,
             owner: AccountId,
@@ -630,52 +682,52 @@ fn erc1155_is_approved_for_all(
             let mut ans = false;
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x36, 0x03, 0x4D, 0x3E];//is_approved_for_all  
-                let (gas_limit,transferred_value)=(0,0);
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0x36, 0x03, 0x4D, 0x3E]; //is_approved_for_all
+                let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(owner).push_arg(operator),
-                )
-                .returns::<bool>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
-                ans=result?;
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(
+                        ExecutionInput::new(selector.into())
+                            .push_arg(owner)
+                            .push_arg(operator),
+                    )
+                    .returns::<bool>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ans = result?;
             }
             Ok(ans)
         }
 
-        fn  marketplace_get_price(
+        fn marketplace_get_price(
             &self,
             token: AccountId,
             nft_address: AccountId,
         ) -> Result<Balance> {
-            let mut ans=0;
+            let mut ans = 0;
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E];//owner_of  
-                let (gas_limit,transferred_value)=(0,0);
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //owner_of
+                let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(nft_address),
-                )
-                .returns::<Balance>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
-               ans=result?;
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(ExecutionInput::new(selector.into()).push_arg(nft_address))
+                    .returns::<Balance>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ans = result?;
             }
             Ok(ans)
         }
@@ -697,7 +749,10 @@ fn erc1155_is_approved_for_all(
             ensure!(AccountId::from([0x0; 32]) != owner, Error::InvalidId);
             ensure!(deadline > self.get_now(), Error::InvalidExpiration);
             ensure!(price > 0, Error::InvalidExpiration);
-            let offer = self.offers.get(&(_bundle_id.clone(), self.env().caller())).unwrap();
+            let offer = self
+                .offers
+                .get(&(_bundle_id.clone(), self.env().caller()))
+                .unwrap();
             ensure!(offer.deadline <= self.get_now(), Error::OfferAlreadyCreated);
 
             self.offers.insert(
@@ -723,12 +778,16 @@ fn erc1155_is_approved_for_all(
         pub fn cancel_offer(&mut self, bundle_id: String) -> Result<()> {
             let _bundle_id = self.get_bundle_id(&bundle_id);
 
-            let offer = self.offers.get(&(_bundle_id.clone(), self.env().caller())).unwrap();
+            let offer = self
+                .offers
+                .get(&(_bundle_id.clone(), self.env().caller()))
+                .unwrap();
             ensure!(
                 offer.deadline > self.get_now(),
                 Error::OfferNotExistsOrExpired
             );
-            self.offers.remove(&(_bundle_id.clone(), self.env().caller()));
+            self.offers
+                .remove(&(_bundle_id.clone(), self.env().caller()));
             self.env().emit_event(OfferCanceled {
                 creator: self.env().caller(),
                 bundle_id,
@@ -752,13 +811,13 @@ fn erc1155_is_approved_for_all(
 
             let price = offer.price;
             let mut fee_amount = price * self.platform_fee / 1000;
-                        self.erc20_transfer_from(
+            self.erc20_transfer_from(offer.pay_token, creator, self.fee_recipient, fee_amount)?;
+            self.erc20_transfer_from(
                 offer.pay_token,
-                creator,
-                self.fee_recipient,
-                fee_amount,
+                self.env().caller(),
+                owner,
+                price - fee_amount,
             )?;
-         self.erc20_transfer_from(offer.pay_token, self.env().caller(), owner, price - fee_amount)?;
 
             let mut listing = self
                 .listings
@@ -773,30 +832,38 @@ fn erc1155_is_approved_for_all(
                 {
                     // Transfer NFT to buyer
                     if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
-                self.erc721_transfer_from(nft_address, self.env().caller(), creator, token_id)?;
-                    } else if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155) {
+                        self.erc721_transfer_from(
+                            nft_address,
+                            self.env().caller(),
+                            creator,
+                            token_id,
+                        )?;
+                    } else if self
+                        .supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155)
+                    {
                         self.erc1155_transfer_from(
-                    nft_address,
-                      self.env().caller(),
-                                creator,
-                    token_id,
-                    quantity,
-                )?;
-                
+                            nft_address,
+                            self.env().caller(),
+                            creator,
+                            token_id,
+                            quantity,
+                        )?;
                     }
                     self.marketplace_validate_item_sold(nft_address, token_id, owner, creator);
                 }
             }
-            self.listings.remove(&(self.env().caller(), _bundle_id.clone()));
+            self.listings
+                .remove(&(self.env().caller(), _bundle_id.clone()));
             listing.price = 0;
-            self.listings.insert(&(creator, _bundle_id.clone()), &listing);
+            self.listings
+                .insert(&(creator, _bundle_id.clone()), &listing);
             self.owners.insert(&_bundle_id, &creator);
             self.offers.remove(&(_bundle_id.clone(), creator));
 
             self.env().emit_event(ItemSold {
                 seller: self.env().caller(),
                 buyer: creator,
-                bundle_id:bundle_id.clone(),
+                bundle_id: bundle_id.clone(),
                 pay_token: offer.pay_token,
                 unit_price: self.get_price(offer.pay_token)?,
                 price: offer.price,
@@ -804,7 +871,7 @@ fn erc1155_is_approved_for_all(
             self.env().emit_event(OfferCanceled { creator, bundle_id });
             Ok(())
         }
-fn erc721_transfer_from(
+        fn erc721_transfer_from(
             &mut self,
             token: AccountId,
             from: AccountId,
@@ -813,22 +880,25 @@ fn erc721_transfer_from(
         ) -> Result<()> {
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x0B, 0x39, 0x6F, 0x18];//transfer_from
-                let (gas_limit,transferred_value)=(0,0);
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0x0B, 0x39, 0x6F, 0x18]; //transfer_from
+                let (gas_limit, transferred_value) = (0, 0);
                 let _ = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(from).push_arg(to).push_arg(token_id),
-                )
-                .returns::<()>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(
+                        ExecutionInput::new(selector.into())
+                            .push_arg(from)
+                            .push_arg(to)
+                            .push_arg(token_id),
+                    )
+                    .returns::<()>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
             }
             Ok(())
         }
@@ -842,22 +912,27 @@ fn erc721_transfer_from(
         ) -> Result<()> {
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x53,0x24,0xD5,0x56];//safe_transfer_from 
-                let (gas_limit,transferred_value)=(0,0);
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0x53, 0x24, 0xD5, 0x56]; //safe_transfer_from
+                let (gas_limit, transferred_value) = (0, 0);
                 let _ = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(from).push_arg(to).push_arg(token_id).push_arg(value).push_arg(Vec::<u8>::new()),
-                )
-                .returns::<()>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(
+                        ExecutionInput::new(selector.into())
+                            .push_arg(from)
+                            .push_arg(to)
+                            .push_arg(token_id)
+                            .push_arg(value)
+                            .push_arg(Vec::<u8>::new()),
+                    )
+                    .returns::<()>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
             }
             Ok(())
         }
@@ -870,22 +945,25 @@ fn erc721_transfer_from(
         ) -> Result<()> {
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x0B, 0x39, 0x6F, 0x18];//transfer_from
-                let (gas_limit,transferred_value)=(0,0);
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0x0B, 0x39, 0x6F, 0x18]; //transfer_from
+                let (gas_limit, transferred_value) = (0, 0);
                 let _ = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(from).push_arg(to).push_arg(value),
-                )
-                .returns::<()>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(
+                        ExecutionInput::new(selector.into())
+                            .push_arg(from)
+                            .push_arg(to)
+                            .push_arg(value),
+                    )
+                    .returns::<()>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
             }
             Ok(())
         }
@@ -899,23 +977,25 @@ fn erc721_transfer_from(
             let mut ans = false;
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x0F, 0x59, 0x22, 0xE9];//is_approved_for_all  
-                let (gas_limit,transferred_value)=(0,0);
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0x0F, 0x59, 0x22, 0xE9]; //is_approved_for_all
+                let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(owner).push_arg(operator),
-                )
-                .returns::<bool>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
-                ans=result?;
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(
+                        ExecutionInput::new(selector.into())
+                            .push_arg(owner)
+                            .push_arg(operator),
+                    )
+                    .returns::<bool>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ans = result?;
             }
             Ok(ans)
         }
@@ -928,23 +1008,21 @@ fn erc721_transfer_from(
             let mut ans = None;
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E];//owner_of  
-                let (gas_limit,transferred_value)=(0,0);
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //owner_of
+                let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(token_id),
-                )
-                .returns::<Option<AccountId>>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
-                ans=result?;
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(ExecutionInput::new(selector.into()).push_arg(token_id))
+                    .returns::<Option<AccountId>>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ans = result?;
             }
             Ok(ans)
         }
@@ -959,7 +1037,8 @@ fn erc721_transfer_from(
                 );
                 let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
                     ink_env::call::FromAccountId::from_account_id(self.address_registry);
-                unit_price = self.marketplace_get_price(address_registry_instance.marketplace(),pay_token)?;
+                unit_price =
+                    self.marketplace_get_price(address_registry_instance.marketplace(), pay_token)?;
             }
             Ok(unit_price)
         }
@@ -974,47 +1053,40 @@ fn erc721_transfer_from(
             #[cfg(not(test))]
             {
                 if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
-                       ensure!(
-                    Some(self.env().caller()) == self.erc721_owner_of(nft_address,token_id)?,
-                    Error::NotOwningItem
-                );
+                    ensure!(
+                        Some(self.env().caller()) == self.erc721_owner_of(nft_address, token_id)?,
+                        Error::NotOwningItem
+                    );
                 } else if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155) {
-     ensure!(
-                    quantity <= self.erc1155_balance_of(nft_address,owner)?,
-                    Error::NotOwningItem
-                );
-                   
+                    ensure!(
+                        quantity <= self.erc1155_balance_of(nft_address, owner)?,
+                        Error::NotOwningItem
+                    );
                 } else {
                     ensure!(false, Error::InvalidNFTAddress);
                 }
             }
             Ok(())
         }
- fn erc1155_balance_of(
-            &self,
-            token: AccountId,
-            owner: AccountId,
-        ) -> Result<Balance> {
+        fn erc1155_balance_of(&self, token: AccountId, owner: AccountId) -> Result<Balance> {
             let mut ans = Balance::default();
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x16, 0x4B, 0x9B, 0xA0];//balance_of   
-                let (gas_limit,transferred_value)=(0,0);
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0x16, 0x4B, 0x9B, 0xA0]; //balance_of
+                let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(owner),
-                )
-                .returns::<Balance>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
-                ans=result?;
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(ExecutionInput::new(selector.into()).push_arg(owner))
+                    .returns::<Balance>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ans = result?;
             }
             Ok(ans)
         }
@@ -1029,8 +1101,12 @@ fn erc721_transfer_from(
                         AccountId::from([0x0; 32]) != address_registry_instance.token_registry(),
                         Error::InvalidPayToken
                     );
-                     ensure!(
-                        self.token_registry_enabled( address_registry_instance.token_registry(),pay_token).unwrap_or(false),
+                    ensure!(
+                        self.token_registry_enabled(
+                            address_registry_instance.token_registry(),
+                            pay_token
+                        )
+                        .unwrap_or(false),
                         Error::InvalidPayToken,
                     );
                 }
@@ -1038,29 +1114,27 @@ fn erc721_transfer_from(
             Ok(())
         }
         #[cfg_attr(test, allow(unused_variables))]
-        fn supports_interface_check(&self, callee: AccountId, data: [u8;4]) -> bool {
+        fn supports_interface_check(&self, callee: AccountId, data: [u8; 4]) -> bool {
             // This is disabled during tests due to the use of `invoke_contract()` not being
             // supported (tests end up panicking).
             let mut ans = false;
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                use ink_env::call::{build_call, Call, ExecutionInput};
                 let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C];
-                let (gas_limit,transferred_value)=(0,0);
+                let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(callee)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(data),
-                )
-                .returns::<bool>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
-                ans=result.unwrap_or(false);
+                    .call_type(
+                        Call::new()
+                            .callee(callee)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(ExecutionInput::new(selector.into()).push_arg(data))
+                    .returns::<bool>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ans = result.unwrap_or(false);
             }
             ans
         }
@@ -1128,7 +1202,10 @@ fn erc721_transfer_from(
                     Error::SenderMustBeBundleMarketplace
                 );
             }
-            let items = self.bundle_ids_per_item.get(&(nft_address, token_id)).unwrap();
+            let items = self
+                .bundle_ids_per_item
+                .get(&(nft_address, token_id))
+                .unwrap();
             for _bundle_id in &items {
                 let owner = self.owners.get(&_bundle_id).unwrap();
                 if owner != AccountId::from([0x0; 32]) {
@@ -1158,16 +1235,20 @@ fn erc721_transfer_from(
                             });
                             continue;
                         } else {
-                            let indexu=index as u128;
+                            let indexu = index as u128;
                             if index < listing.nfts.len() - 1 {
-                                let last_index=listing.nfts.len() - 1;
+                                let last_index = listing.nfts.len() - 1;
                                 listing.nfts.swap(index, last_index);
-                                let last_index=listing.token_ids.len() - 1;
+                                let last_index = listing.token_ids.len() - 1;
                                 listing.token_ids.swap(index, last_index);
-                                let last_index=listing.quantities.len() - 1;
+                                let last_index = listing.quantities.len() - 1;
                                 listing.quantities.swap(index, last_index);
                                 self.nft_indices.insert(
-                                    &(_bundle_id.clone(), listing.nfts[index], listing.token_ids[index]),
+                                    &(
+                                        _bundle_id.clone(),
+                                        listing.nfts[index],
+                                        listing.token_ids[index],
+                                    ),
                                     &indexu,
                                 );
                             }

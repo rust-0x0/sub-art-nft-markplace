@@ -2,8 +2,6 @@
 
 VERSION=0.1
 WORK_DIR=$(cd $(dirname $0); pwd)
-ERC1155_MODULE=sub_price_seed
-HEXSPACE_MODULE=sub_token_registry
 
 function build_module() {
     m_name=$1
@@ -26,10 +24,13 @@ echo "clean release"
 rm -rf ${WORK_DIR}/release
 mkdir -p ${WORK_DIR}/release
 
-# build_module ${ERC1155_MODULE}
-# build_module ${HEXSPACE_MODULE}
-# modules=($(ls -l | grep '^release'))
-modules=(sub_price_seed sub_token_registry)
+
+modules=($(ls -d erc*))
+for module in ${modules[@]}; do
+        build_module $module
+done
+
+modules=($(ls -d sub*))
 for module in ${modules[@]}; do
         build_module $module
 done

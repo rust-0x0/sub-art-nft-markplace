@@ -1,7 +1,7 @@
 // As the on-chain storage fee is taken into consideration, the complete relationship network isn’t stored on-chain, and it needs to be figured out off-chain. Given that 5Degrees completely follows the EIP-1155 protocol, we can quickly index data through TransferSingle and TransferBatch to establish complete relationship network data.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-pub use self::sub_art_tradable::{SubArtTradable,SubArtTradableRef};
+pub use self::sub_art_tradable::{SubArtTradable, SubArtTradableRef};
 use ink_env::AccountId;
 use ink_lang as ink;
 use ink_prelude::vec::Vec;
@@ -31,7 +31,7 @@ type Balance = <ink_env::DefaultEnvironment as ink_env::Environment>::Balance;
 #[derive(Debug, PartialEq, scale::Encode, scale::Decode)]
 #[cfg_attr(feature = "std", derive(scale_info::TypeInfo))]
 pub enum Error {
-OnlyOwner,
+    OnlyOwner,
     /// This token ID has not yet been created by the contract.
     UnexistentToken,
     /// The caller tried to sending tokens to the zero-address (`0x00`).
@@ -45,8 +45,8 @@ OnlyOwner,
     /// The number of tokens being transferred does not match the specified number of transfers.
     BatchTransferMismatch,
     TransferFailed,
-InsufficientFunds,
-NewOwnerIsTheZeroAddress,
+    InsufficientFunds,
+    NewOwnerIsTheZeroAddress,
 }
 
 // The ERC-1155 result types.
@@ -191,27 +191,28 @@ pub trait Erc1155TokenReceiver {
 */
 #[ink::contract]
 pub mod sub_art_tradable {
-use ink_lang as ink;
+    #[cfg_attr(test, allow(dead_code))]
+    const INTERFACE_ID_ERC1155: [u8; 4] = [0xD9, 0xB6, 0x7A, 0x26];
+
     use super::*;
-use ink_prelude::vec::Vec;
- use ink_prelude::string::String;
+    use ink_lang as ink;
+    use ink_prelude::string::String;
+    use ink_prelude::vec::Vec;
     use ink_storage::{traits::SpreadAllocate, Mapping};
 
     type Owner = AccountId;
     type Operator = AccountId;
 
-   #[ink(event)]
+    #[ink(event)]
     pub struct ContractCreated {
-       pub  creator: AccountId,
-       pub  nft: AccountId,
+        pub creator: AccountId,
+        pub nft: AccountId,
     }
     #[ink(event)]
     pub struct ContractDisabled {
-       pub  caller: AccountId,
-       pub  nft: AccountId,
+        pub caller: AccountId,
+        pub nft: AccountId,
     }
-
- 
 
     /// Indicate that a token transfer has occured.
     ///
@@ -364,7 +365,7 @@ use ink_prelude::vec::Vec;
         platform_fee: Balance,
         /// # note Platform fee receipient
         fee_recipient: AccountId,
-        owner:AccountId,
+        owner: AccountId,
     }
 
     impl SubArtTradable {
@@ -389,6 +390,10 @@ use ink_prelude::vec::Vec;
                 contract.fee_recipient = fee_recipient;
                 contract.platform_fee = platform_fee;
             })
+        }
+        #[ink(message)]
+        pub fn supports_interface(&self, interface_id: [u8; 4]) -> bool {
+            INTERFACE_ID_ERC1155 == interface_id
         }
         #[ink(message)]
         pub fn uri(&self, id: TokenId) -> Result<String> {
@@ -481,25 +486,34 @@ use ink_prelude::vec::Vec;
          * @param _id uint256 ID of the token to set its URI
          * @param _uri string URI to assign
          */
-        fn set_token_uri(&mut self, id: TokenId, uri: &String)->Result<()> {
+        fn set_token_uri(&mut self, id: TokenId, uri: &String) -> Result<()> {
             ensure!(self.exists(id), Error::UnexistentToken);
             self.token_uris.insert(&id, uri);
             Ok(())
         }
-     #[ink(message)]
+        #[ink(message)]
         pub fn transfer_ownership(&mut self, new_owner: AccountId) -> Result<()> {
             ensure!(self.env().caller() == self.owner, Error::OnlyOwner);
-            ensure!(  AccountId::default() != new_owner, Error::NewOwnerIsTheZeroAddress);
-            let previous_owner=self.owner;
-            self.owner=new_owner;
-       self.env().emit_event(OwnershipTransferred {
+            ensure!(
+                AccountId::default() != new_owner,
+                Error::NewOwnerIsTheZeroAddress
+            );
+            let previous_owner = self.owner;
+            self.owner = new_owner;
+            self.env().emit_event(OwnershipTransferred {
                 previous_owner,
                 new_owner,
             });
             Ok(())
         }
         #[ink(message)]
-        pub fn _mint_to(&mut self, to: AccountId, token_id: TokenId, value: Balance,_data:Vec<u8>) -> Result<()> {
+        pub fn _mint_to(
+            &mut self,
+            to: AccountId,
+            token_id: TokenId,
+            value: Balance,
+            _data: Vec<u8>,
+        ) -> Result<()> {
             let caller = self.env().caller();
             ensure!(to != AccountId::default(), Error::ZeroAddressTransfer);
             self.balances.insert(&(to, token_id), &value);

@@ -3,7 +3,7 @@
 //! This is an ERC-721 Token implementation.
 
 #![cfg_attr(not(feature = "std"), no_std)]
-pub use self::sub_nft_tradable::{SubNFTTradable,SubNFTTradableRef};
+pub use self::sub_nft_tradable::{SubNFTTradable, SubNFTTradableRef};
 
 use ink_lang as ink;
 
@@ -18,7 +18,10 @@ macro_rules! ensure {
     }};
 }
 #[ink::contract]
-pub  mod sub_nft_tradable {
+pub mod sub_nft_tradable {
+    #[cfg_attr(test, allow(dead_code))]
+    const INTERFACE_ID_ERC721: [u8; 4] = [0x80, 0xAC, 0x58, 0xCD];
+
     use ink_lang as ink;
     use ink_prelude::string::String;
     use ink_storage::{traits::SpreadAllocate, Mapping};
@@ -86,7 +89,7 @@ pub  mod sub_nft_tradable {
         current_token_id: TokenId,
         ///  TokenID -> Uri
         token_uris: Mapping<TokenId, String>,
-      name: String,
+        name: String,
         symbol: String,
         /// @notice Auction contract
         auction: AccountId,
@@ -117,27 +120,24 @@ pub  mod sub_nft_tradable {
         TokenURIIsEmpty,
         DesignerIsZeroAddress,
         TokenShouldExist,
-OperatorQueryForNonExistentToken,
-TransferFailed,
-NewOwnerIsTheZeroAddress,
+        OperatorQueryForNonExistentToken,
+        TransferFailed,
+        NewOwnerIsTheZeroAddress,
     }
 
     // The SubNFTTradable result types.
     pub type Result<T> = core::result::Result<T, Error>;
-   
+
     #[ink(event)]
     pub struct ContractCreated {
-       pub  creator: AccountId,
-       pub  nft: AccountId,
+        pub creator: AccountId,
+        pub nft: AccountId,
     }
     #[ink(event)]
     pub struct ContractDisabled {
-       pub  caller: AccountId,
-       pub  nft: AccountId,
+        pub caller: AccountId,
+        pub nft: AccountId,
     }
-
-
-
 
     /// Event emitted when a token transfer occurs.
     #[ink(event)]
@@ -171,7 +171,7 @@ NewOwnerIsTheZeroAddress,
         operator: AccountId,
         approved: bool,
     }
-   #[ink(event)]
+    #[ink(event)]
     pub struct OwnershipTransferred {
         #[ink(topic)]
         previous_owner: AccountId,
@@ -222,6 +222,10 @@ NewOwnerIsTheZeroAddress,
                 contract.fee_recipient = fee_recipient;
             })
         }
+        #[ink(message)]
+        pub fn supports_interface(&self, interface_id: [u8; 4]) -> bool {
+            INTERFACE_ID_ERC721 == interface_id
+        }
         /**
         @notice Method for updating platform fee
         @dev Only admin
@@ -254,11 +258,7 @@ NewOwnerIsTheZeroAddress,
          * @param _to address of the future owner of the token
          */
         #[ink(message, payable)]
-        pub fn mint_to_and_uri(
-            &mut self,
-            to: AccountId,
-            token_uri: String,
-        ) -> Result<TokenId> {
+        pub fn mint_to_and_uri(&mut self, to: AccountId, token_uri: String) -> Result<TokenId> {
             ensure!(
                 self.env().transferred_value() >= self.platform_fee,
                 Error::InsufficientFundsToMint
@@ -281,7 +281,7 @@ NewOwnerIsTheZeroAddress,
             );
             self.env().emit_event(Minted {
                 token_id,
-                beneficiary:to,
+                beneficiary: to,
                 token_uri,
                 minter,
             });
@@ -384,13 +384,16 @@ NewOwnerIsTheZeroAddress,
             Ok(())
         }
         ///ERC721 ==============
- #[ink(message)]
+        #[ink(message)]
         pub fn transfer_ownership(&mut self, new_owner: AccountId) -> Result<()> {
             ensure!(self.env().caller() == self.owner, Error::OnlyOwner);
-            ensure!(  AccountId::default() != new_owner, Error::NewOwnerIsTheZeroAddress);
-            let previous_owner=self.owner;
-            self.owner=new_owner;
-       self.env().emit_event(OwnershipTransferred {
+            ensure!(
+                AccountId::default() != new_owner,
+                Error::NewOwnerIsTheZeroAddress
+            );
+            let previous_owner = self.owner;
+            self.owner = new_owner;
+            self.env().emit_event(OwnershipTransferred {
                 previous_owner,
                 new_owner,
             });

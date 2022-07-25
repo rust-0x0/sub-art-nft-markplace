@@ -29,7 +29,7 @@ pub mod sub_auction {
     /// A token ID.
     pub type TokenId = u128;
 
-    #[derive(Default,scale::Encode, scale::Decode, SpreadLayout, PackedLayout)]
+    #[derive(Default, scale::Encode, scale::Decode, SpreadLayout, PackedLayout)]
     #[cfg_attr(
         feature = "std",
         derive(
@@ -57,7 +57,7 @@ pub mod sub_auction {
 
     /// A Transaction is what every `owner` can submit for confirmation by other owners.
     /// If enough owners agree it will be executed by the contract.
-    #[derive(Default,scale::Encode, scale::Decode, SpreadLayout, PackedLayout)]
+    #[derive(Default, scale::Encode, scale::Decode, SpreadLayout, PackedLayout)]
     #[cfg_attr(
         feature = "std",
         derive(
@@ -134,7 +134,7 @@ pub mod sub_auction {
         AuctionShouldEndAfter5Minutes,
         FailedToRefundPreviousBidder,
         InvalidAddress,
-TransactionFailed,
+        TransactionFailed,
     }
 
     // The SubAuction result types.
@@ -548,8 +548,13 @@ TransactionFailed,
                 }
             }
             ensure!(
-                self.erc721_transfer_from(nft_address, self.erc721_owner_of(nft_address,token_id)?.unwrap(),winner, token_id)
-                    .is_ok(),
+                self.erc721_transfer_from(
+                    nft_address,
+                    self.erc721_owner_of(nft_address, token_id)?.unwrap(),
+                    winner,
+                    token_id
+                )
+                .is_ok(),
                 Error::NotOwneAndOrContractNotApproved
             );
             let mut unit_price = self.get_bundle_marketplace_unit_price(nft_address, token_id)?;
@@ -851,10 +856,7 @@ TransactionFailed,
         ) -> (u128, bool) {
             // Check valid and not resulted
             let auction = self.auctions.get((nft_address, token_id)).unwrap();
-            (
-                auction.start_time,
-                auction.resulted,
-            )
+            (auction.start_time, auction.resulted)
         }
         /**
         @notice Method for getting all info about the highest bidder
@@ -885,7 +887,7 @@ TransactionFailed,
                 token_contract != AccountId::from([0x0; 32]),
                 Error::InvalidAddress
             );
-            let balance=self.erc20_balance_of(token_contract,self.env().account_id())?;
+            let balance = self.erc20_balance_of(token_contract, self.env().account_id())?;
             ensure!(
                 self.erc20_transfer(token_contract, self.env().caller(), balance)
                     .is_ok(),
@@ -893,35 +895,28 @@ TransactionFailed,
             );
             Ok(())
         }
-        fn erc20_balance_of(
-            &mut self,
-            token: AccountId,
-            owner: AccountId,
-        ) -> Result<Balance> {
+        fn erc20_balance_of(&mut self, token: AccountId, owner: AccountId) -> Result<Balance> {
             let mut ans = Balance::default();
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x16, 0x4B, 0x9B, 0xA0];//balance_of   
-                let (gas_limit,transferred_value)=(0,0);
+                let selector: [u8; 4] = [0x0F, 0x75, 0x5A, 0x56]; //erc20 balance_of 
+                let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(owner),
-                )
-                .returns::<Balance>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
-                ans=result?;
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(ExecutionInput::new(selector.into()).push_arg(owner))
+                    .returns::<Balance>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ans = result?;
             }
             Ok(ans)
         }
-
     }
     #[ink(impl)]
     impl SubAuction {
@@ -1116,12 +1111,12 @@ TransactionFailed,
             nft_address: AccountId,
             token_id: TokenId,
             pay_token: AccountId,
-        ) -> Result<()>{
-       ensure!(
-                    Some(self.env().caller()) == self.erc721_owner_of(nft_address,token_id)?
-                        && self.erc721_is_approved_for_all(nft_address,owner, operator)?,
-                    Error::NotOwneAndOrContractNotApproved
-                );
+        ) -> Result<()> {
+            ensure!(
+                Some(self.env().caller()) == self.erc721_owner_of(nft_address, token_id)?
+                    && self.erc721_is_approved_for_all(nft_address, owner, operator)?,
+                Error::NotOwneAndOrContractNotApproved
+            );
             #[cfg(not(test))]
             {
                 let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
@@ -1132,34 +1127,35 @@ TransactionFailed,
                     Error::InvalidPayToken
                 );
                 ensure!(
-                    self.token_registry_enabled(address_registry_instance.token_registry(),pay_token)?,
+                    self.token_registry_enabled(
+                        address_registry_instance.token_registry(),
+                        pay_token
+                    )?,
                     Error::InvalidPayToken,
                 );
             }
             Ok(())
         }
         #[cfg_attr(test, allow(unused_variables))]
-        fn token_registry_enabled(&self, callee: AccountId,token: AccountId) -> Result<bool> {
+        fn token_registry_enabled(&self, callee: AccountId, token: AccountId) -> Result<bool> {
             let mut ans = false;
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C];//0x1414631c enabled 
-                let (gas_limit,transferred_value)=(0,0);
+                let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C]; // token_registry_enabled
+                let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(callee)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(token),
-                )
-                .returns::<bool>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
-                ans=result?;
+                    .call_type(
+                        Call::new()
+                            .callee(callee)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(ExecutionInput::new(selector.into()).push_arg(token))
+                    .returns::<bool>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ans = result?;
             }
             Ok(ans)
         }
@@ -1172,22 +1168,25 @@ TransactionFailed,
         ) -> Result<()> {
             #[cfg(not(test))]
             {
-                 use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x0B, 0x39, 0x6F, 0x18];//transfer_from
-                let (gas_limit,transferred_value)=(0,0);
+                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                let selector: [u8; 4] = [0x0B, 0x39, 0x6F, 0x18]; //erc721 transfer_from
+                let (gas_limit, transferred_value) = (0, 0);
                 let _ = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(from).push_arg(to).push_arg(token_id),
-                )
-                .returns::<()>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(
+                        ExecutionInput::new(selector.into())
+                            .push_arg(from)
+                            .push_arg(to)
+                            .push_arg(token_id),
+                    )
+                    .returns::<()>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
             }
             Ok(())
         }
@@ -1201,22 +1200,25 @@ TransactionFailed,
         ) -> Result<()> {
             #[cfg(not(test))]
             {
-                 use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x0B, 0x39, 0x6F, 0x18];//transfer_from
-                let (gas_limit,transferred_value)=(0,0);
+                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                let selector: [u8; 4] = [0x0B, 0x39, 0x6F, 0x18]; //erc20 transfer_from
+                let (gas_limit, transferred_value) = (0, 0);
                 let _ = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(from).push_arg(to).push_arg(value),
-                )
-                .returns::<()>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(
+                        ExecutionInput::new(selector.into())
+                            .push_arg(from)
+                            .push_arg(to)
+                            .push_arg(value),
+                    )
+                    .returns::<()>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
             }
             Ok(())
         }
@@ -1229,25 +1231,27 @@ TransactionFailed,
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x84, 0xA1, 0x5D, 0xA1];//transfer 
-                let (gas_limit,transferred_value)=(0,0);
+                let selector: [u8; 4] = [0x84, 0xA1, 0x5D, 0xA1]; //erc20 transfer
+                let (gas_limit, transferred_value) = (0, 0);
                 let _ = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(to).push_arg(value),
-                )
-                .returns::<()>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(
+                        ExecutionInput::new(selector.into())
+                            .push_arg(to)
+                            .push_arg(value),
+                    )
+                    .returns::<()>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
             }
             Ok(())
         }
- fn erc721_is_approved_for_all(
+        fn erc721_is_approved_for_all(
             &self,
             token: AccountId,
             owner: AccountId,
@@ -1257,22 +1261,24 @@ TransactionFailed,
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x0F, 0x59, 0x22, 0xE9];//is_approved_for_all  
-                let (gas_limit,transferred_value)=(0,0);
+                let selector: [u8; 4] = [0x0F, 0x59, 0x22, 0xE9]; //erc721 is_approved_for_all
+                let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(owner).push_arg(operator),
-                )
-                .returns::<bool>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
-                ans=result?;
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(
+                        ExecutionInput::new(selector.into())
+                            .push_arg(owner)
+                            .push_arg(operator),
+                    )
+                    .returns::<bool>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ans = result?;
             }
             Ok(ans)
         }
@@ -1286,22 +1292,20 @@ TransactionFailed,
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E];//owner_of  
-                let (gas_limit,transferred_value)=(0,0);
+                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //erc721 owner_of
+                let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(token_id),
-                )
-                .returns::<Option<AccountId>>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
-                ans=result?;
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(ExecutionInput::new(selector.into()).push_arg(token_id))
+                    .returns::<Option<AccountId>>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ans = result?;
             }
             Ok(ans)
         }
@@ -1313,17 +1317,18 @@ TransactionFailed,
             nft_address: AccountId,
             token_id: TokenId,
             auction_owner: AccountId,
-        ) -> Result<()>{
-                ensure!(
-                    Some(self.env().caller()) == self.erc721_owner_of(nft_address,token_id)?
-                        && self.env().caller() == auction_owner,
-                    Error::SenderMustBeItemOwner
-                );
+        ) -> Result<()> {
+            ensure!(
+                Some(self.env().caller()) == self.erc721_owner_of(nft_address, token_id)?
+                    && self.env().caller() == auction_owner,
+                Error::SenderMustBeItemOwner
+            );
 
-                ensure!(
-                    self.erc721_is_approved_for_all(nft_address,owner, operator).is_ok(),
-                    Error::AuctioncNotApproved
-                );
+            ensure!(
+                self.erc721_is_approved_for_all(nft_address, owner, operator)
+                    .is_ok(),
+                Error::AuctioncNotApproved
+            );
             Ok(())
         }
         fn ensure_erc721_owner_of(
@@ -1331,29 +1336,37 @@ TransactionFailed,
             nft_address: AccountId,
             token_id: TokenId,
             auction_owner: AccountId,
-        ) -> Result<()>{
-                ensure!(
-                    Some(self.env().caller()) == self.erc721_owner_of(nft_address,token_id)?
-                        && self.env().caller() == auction_owner,
-                    Error::SenderMustBeItemOwner
-                );
+        ) -> Result<()> {
+            ensure!(
+                Some(self.env().caller()) == self.erc721_owner_of(nft_address, token_id)?
+                    && self.env().caller() == auction_owner,
+                Error::SenderMustBeItemOwner
+            );
             Ok(())
         }
         fn get_marketplace_minters_royalties(
             &self,
             nft_address: AccountId,
             token_id: TokenId,
-        ) -> Result<(AccountId, Balance)>{
-            let mut ans =(AccountId::from([0x0; 32]), 0);
+        ) -> Result<(AccountId, Balance)> {
+            let mut ans = (AccountId::from([0x0; 32]), 0);
             #[cfg(not(test))]
             {
                 let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
                     ink_env::call::FromAccountId::from_account_id(self.address_registry);
-                let minter = self.marketplace_minters( address_registry_instance.marketplace(),nft_address, token_id)?;
-                let royalty = self.marketplace_royalties( address_registry_instance.marketplace(),nft_address, token_id)?;
-               ans=(minter, royalty);
+                let minter = self.marketplace_minters(
+                    address_registry_instance.marketplace(),
+                    nft_address,
+                    token_id,
+                )?;
+                let royalty = self.marketplace_royalties(
+                    address_registry_instance.marketplace(),
+                    nft_address,
+                    token_id,
+                )?;
+                ans = (minter, royalty);
             }
-                Ok(ans)
+            Ok(ans)
         }
         fn marketplace_minters(
             &self,
@@ -1361,26 +1374,28 @@ TransactionFailed,
             nft_address: AccountId,
             token_id: TokenId,
         ) -> Result<AccountId> {
-            let mut ans = AccountId::from([0x0;32]);
+            let mut ans = AccountId::from([0x0; 32]);
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E];//owner_of  
-                let (gas_limit,transferred_value)=(0,0);
+                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //marketplace_minters
+                let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(nft_address).push_arg(token_id),
-                )
-                .returns::<AccountId>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
-                ans=result?;
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(
+                        ExecutionInput::new(selector.into())
+                            .push_arg(nft_address)
+                            .push_arg(token_id),
+                    )
+                    .returns::<AccountId>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ans = result?;
             }
             Ok(ans)
         }
@@ -1395,64 +1410,67 @@ TransactionFailed,
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E];//owner_of  
-                let (gas_limit,transferred_value)=(0,0);
+                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //marketplace_royalties
+                let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(nft_address).push_arg(token_id),
-                )
-                .returns::<Balance>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
-                ans=result?;
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(
+                        ExecutionInput::new(selector.into())
+                            .push_arg(nft_address)
+                            .push_arg(token_id),
+                    )
+                    .returns::<Balance>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ans = result?;
             }
             Ok(ans)
         }
         fn get_marketplace_collection_royalties(
             &self,
             nft_address: AccountId,
-        ) -> Result<(AccountId, Balance)>{
-            let mut ans =(AccountId::from([0x0; 32]), 0);
+        ) -> Result<(AccountId, Balance)> {
+            let mut ans = (AccountId::from([0x0; 32]), 0);
             #[cfg(not(test))]
             {
                 let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
                     ink_env::call::FromAccountId::from_account_id(self.address_registry);
-                let (minter,royalty) = self.marketplace_collection_royalties(address_registry_instance.marketplace(),nft_address)?;
-               ans=(minter, royalty);
+                let (minter, royalty) = self.marketplace_collection_royalties(
+                    address_registry_instance.marketplace(),
+                    nft_address,
+                )?;
+                ans = (minter, royalty);
             }
             Ok(ans)
         }
- fn marketplace_collection_royalties(
+        fn marketplace_collection_royalties(
             &self,
             token: AccountId,
             nft_address: AccountId,
-        ) -> Result<(AccountId,Balance)> {
-            let mut ans =(AccountId::from([0x0; 32]), 0);
+        ) -> Result<(AccountId, Balance)> {
+            let mut ans = (AccountId::from([0x0; 32]), 0);
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E];//owner_of  
-                let (gas_limit,transferred_value)=(0,0);
+                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //marketplace_collection_royalties
+                let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(nft_address),
-                )
-                .returns::<(AccountId,Balance)>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
-                ans=result?;
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(ExecutionInput::new(selector.into()).push_arg(nft_address))
+                    .returns::<(AccountId, Balance)>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ans = result?;
             }
             Ok(ans)
         }
@@ -1461,7 +1479,7 @@ TransactionFailed,
             nft_address: AccountId,
             token_id: TokenId,
         ) -> Result<Balance> {
-            let mut ans=Balance::default();
+            let mut ans = Balance::default();
             #[cfg(not(test))]
             {
                 let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
@@ -1470,44 +1488,52 @@ TransactionFailed,
                     AccountId::from([0x0; 32]) == address_registry_instance.bundle_marketplace(),
                     Error::InvalidPayToken
                 );
-                self.bundle_marketplace_validate_item_sold(address_registry_instance.bundle_marketplace(),nft_address, token_id)?;
+                self.bundle_marketplace_validate_item_sold(
+                    address_registry_instance.bundle_marketplace(),
+                    nft_address,
+                    token_id,
+                )?;
 
-                let unit_price = self.marketplace_get_price( address_registry_instance.marketplace(),nft_address)?;
-                ans=unit_price;
+                let unit_price = self
+                    .marketplace_get_price(address_registry_instance.marketplace(), nft_address)?;
+                ans = unit_price;
             }
-    
-                Ok(ans)
+
+            Ok(ans)
         }
-        fn  bundle_marketplace_validate_item_sold(
+        fn bundle_marketplace_validate_item_sold(
             &self,
             token: AccountId,
             nft_address: AccountId,
-            token_id:TokenId,
+            token_id: TokenId,
         ) -> Result<()> {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E];//owner_of  
-                let (gas_limit,transferred_value)=(0,0);
+                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //bundle_marketplace_validate_item_sold
+                let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(nft_address).push_arg(token_id).push_arg(1),
-                )
-                .returns::<(AccountId,Balance)>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
-                ensure!(result.is_ok(),Error::TransactionFailed);
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(
+                        ExecutionInput::new(selector.into())
+                            .push_arg(nft_address)
+                            .push_arg(token_id)
+                            .push_arg(1),
+                    )
+                    .returns::<(AccountId, Balance)>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ensure!(result.is_ok(), Error::TransactionFailed);
             }
             Ok(())
         }
         fn marketplace_get_price(
-            & self,
+            &self,
             token: AccountId,
             nft_address: AccountId,
         ) -> Result<Balance> {
@@ -1515,22 +1541,20 @@ TransactionFailed,
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E];//owner_of  
-                let (gas_limit,transferred_value)=(0,0);
+                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //marketplace_get_price
+                let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                .call_type(
-                    Call::new()
-                        .callee(token)
-                        .gas_limit(gas_limit)
-                        .transferred_value(transferred_value),
-                )
-                .exec_input(
-                    ExecutionInput::new(selector.into()).push_arg(nft_address),
-                )
-                .returns::<Balance>()
-                .fire()
-                .map_err(|_| Error::TransactionFailed);
-                ans=result?;
+                    .call_type(
+                        Call::new()
+                            .callee(token)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(ExecutionInput::new(selector.into()).push_arg(nft_address))
+                    .returns::<Balance>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                ans = result?;
             }
             Ok(ans)
         }
