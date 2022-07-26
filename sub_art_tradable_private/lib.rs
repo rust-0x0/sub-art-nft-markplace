@@ -1014,9 +1014,7 @@ pub mod sub_art_tradable_private {
 
         fn init_contract() -> SubArtTradablePrivate {
             let mut erc = SubArtTradablePrivate::new();
-            erc.balances.insert((alice(), 1), &10);
-            erc.balances.insert((alice(), 2), &20);
-            erc.balances.insert((bob(), 1), &10);
+         
 
             erc
         }

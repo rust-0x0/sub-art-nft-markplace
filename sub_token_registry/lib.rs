@@ -131,11 +131,9 @@ mod sub_token_registry {
             default_accounts().charlie
         }
 
-        fn init_contract() -> Contract {
-            let mut erc = Contract::new();
-            erc.balances.insert((alice(), 1), &10);
-            erc.balances.insert((alice(), 2), &20);
-            erc.balances.insert((bob(), 1), &10);
+        fn init_contract() -> SubTokenRegistry {
+            let mut erc = SubTokenRegistry::new();
+      
 
             erc
         }

@@ -1320,11 +1320,9 @@ mod sub_marketplace {
             default_accounts().charlie
         }
 
-        fn init_contract() -> Contract {
-            let mut erc = Contract::new();
-            erc.balances.insert((alice(), 1), &10);
-            erc.balances.insert((alice(), 2), &20);
-            erc.balances.insert((bob(), 1), &10);
+        fn init_contract() -> SubMarketplace {
+            let mut erc = SubMarketplace::new();
+           
 
             erc
         }

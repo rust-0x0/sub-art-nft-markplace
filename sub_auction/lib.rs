@@ -894,6 +894,11 @@ pub mod sub_auction {
             Ok(())
         }
         fn erc20_balance_of(&mut self, token: AccountId, owner: AccountId) -> Result<Balance> {
+               #[cfg(test)]
+            {
+                ink_env::debug_println!("ans:{:?}",  1);
+                Ok(Balance::default())
+            }
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
@@ -1134,6 +1139,11 @@ pub mod sub_auction {
         }
         #[cfg_attr(test, allow(unused_variables))]
         fn token_registry_enabled(&self, callee: AccountId, token: AccountId) -> Result<bool> {
+                        #[cfg(test)]
+            {
+                ink_env::debug_println!("ans:{:?}",  1);
+                Ok(false)
+            }
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
@@ -1251,6 +1261,11 @@ pub mod sub_auction {
             owner: AccountId,
             operator: AccountId,
         ) -> Result<bool> {
+            #[cfg(test)]
+            {
+                ink_env::debug_println!("ans:{:?}",  1);
+                Ok(false)
+            }
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
@@ -1280,6 +1295,11 @@ pub mod sub_auction {
             token: AccountId,
             token_id: TokenId,
         ) -> Result<Option<AccountId>> {
+            #[cfg(test)]
+            {
+                ink_env::debug_println!("ans:{:?}",  1);
+                Ok(Some(AccountId::default()))
+            }
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
@@ -1339,6 +1359,11 @@ pub mod sub_auction {
             nft_address: AccountId,
             token_id: TokenId,
         ) -> Result<(AccountId, Balance)> {
+            #[cfg(test)]
+            {
+                ink_env::debug_println!("ans:{:?}",  1);
+                Ok((AccountId::default(),Balance::default()))
+            }
             #[cfg(not(test))]
             {
                 let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
@@ -1362,6 +1387,11 @@ pub mod sub_auction {
             nft_address: AccountId,
             token_id: TokenId,
         ) -> Result<AccountId> {
+            #[cfg(test)]
+            {
+                ink_env::debug_println!("ans:{:?}",  1);
+                Ok(AccountId::default())
+            }
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
@@ -1392,6 +1422,11 @@ pub mod sub_auction {
             nft_address: AccountId,
             token_id: TokenId,
         ) -> Result<Balance> {
+            #[cfg(test)]
+            {
+                ink_env::debug_println!("ans:{:?}",  1);
+                Ok(Balance::default())
+            }
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
@@ -1419,6 +1454,11 @@ pub mod sub_auction {
             &self,
             nft_address: AccountId,
         ) -> Result<(AccountId, Balance)> {
+            #[cfg(test)]
+            {
+                ink_env::debug_println!("ans:{:?}",  1);
+                Ok((AccountId::default(),Balance::default()))
+            }
             #[cfg(not(test))]
             {
                 let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
@@ -1435,6 +1475,11 @@ pub mod sub_auction {
             token: AccountId,
             nft_address: AccountId,
         ) -> Result<(AccountId, Balance)> {
+            #[cfg(test)]
+            {
+                ink_env::debug_println!("ans:{:?}",  1);
+                Ok((AccountId::default(),Balance::default()))
+            }
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
@@ -1459,6 +1504,11 @@ pub mod sub_auction {
             nft_address: AccountId,
             token_id: TokenId,
         ) -> Result<Balance> {
+                        #[cfg(test)]
+            {
+                ink_env::debug_println!("ans:{:?}",  1);
+                Ok(Balance::default())
+            }
             #[cfg(not(test))]
             {
                 let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
@@ -1514,6 +1564,11 @@ pub mod sub_auction {
             token: AccountId,
             nft_address: AccountId,
         ) -> Result<Balance> {
+            #[cfg(test)]
+            {
+                ink_env::debug_println!("ans:{:?}",  1);
+                Ok(Balance::default())
+            }
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
@@ -1539,7 +1594,10 @@ pub mod sub_auction {
     mod tests {
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
-        use ink_lang as ink;
+       use ink_env::Clear;
+        // use ink_lang as ink;
+
+        type Event = <SubAuction as ::ink_lang::reflect::ContractEventBase>::Type;
 
         fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
@@ -1560,11 +1618,9 @@ pub mod sub_auction {
             default_accounts().charlie
         }
 
-        fn init_contract() -> Contract {
-            let mut erc = Contract::new();
-            erc.balances.insert((alice(), 1), &10);
-            erc.balances.insert((alice(), 2), &20);
-            erc.balances.insert((bob(), 1), &10);
+        fn init_contract() -> SubAuction {
+            let mut erc = SubAuction::new(alice());
+     
 
             erc
         }
@@ -1778,7 +1834,6 @@ pub mod sub_auction {
             expected_nft_address: AccountId,
             expected_token_id: TokenId,
             expected_pay_token: AccountId,
-
             expected_reserve_price: u128,
         ) {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
@@ -1843,7 +1898,7 @@ pub mod sub_auction {
         }
         fn assert_platform_fee_event(
             event: &ink_env::test::EmittedEvent,
-            expected_platform_fee: bool,
+            expected_platform_fee: Balance,
         ) {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
                 .expect("encountered invalid contract event data buffer");
@@ -1859,7 +1914,7 @@ pub mod sub_auction {
 
         fn assert_platform_fee_recipient_event(
             event: &ink_env::test::EmittedEvent,
-            expected_fee_recipient: bool,
+            expected_fee_recipient: AccountId,
         ) {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
                 .expect("encountered invalid contract event data buffer");
@@ -1877,7 +1932,7 @@ pub mod sub_auction {
 
         fn assert_update_min_bid_increment_event(
             event: &ink_env::test::EmittedEvent,
-            expected_min_bid_increment: bool,
+            expected_min_bid_increment: Balance,
         ) {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
                 .expect("encountered invalid contract event data buffer");
@@ -1895,7 +1950,7 @@ pub mod sub_auction {
 
         fn assert_update_bid_withdrawal_lock_time_event(
             event: &ink_env::test::EmittedEvent,
-            expected_bid_withdrawal_lock_time: bool,
+            expected_bid_withdrawal_lock_time: u128,
         ) {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
                 .expect("encountered invalid contract event data buffer");
@@ -1938,7 +1993,7 @@ pub mod sub_auction {
                 );
                 assert_eq!(bidder, bidder, "encountered invalid BidPlaced.bidder");
                 assert_eq!(
-                    reserve_bid, expected_bid,
+                    bid, expected_bid,
                     "encountered invalid BidPlaced.bid"
                 );
             } else {
@@ -2001,7 +2056,7 @@ pub mod sub_auction {
                 );
                 assert_eq!(bidder, bidder, "encountered invalid BidWithdrawn.bidder");
                 assert_eq!(
-                    reserve_bid, expected_bid,
+                    bid, expected_bid,
                     "encountered invalid BidWithdrawn.bid"
                 );
             } else {
@@ -2064,7 +2119,7 @@ pub mod sub_auction {
                 );
                 assert_eq!(bidder, bidder, "encountered invalid BidRefunded.bidder");
                 assert_eq!(
-                    reserve_bid, expected_bid,
+                    bid, expected_bid,
                     "encountered invalid BidRefunded.bid"
                 );
             } else {

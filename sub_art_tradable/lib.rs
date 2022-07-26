@@ -1009,10 +1009,8 @@ pub mod sub_art_tradable {
         }
 
         fn init_contract() -> SubArtTradable {
-            let mut erc = SubArtTradable::new();
-            erc.balances.insert((alice(), 1), &10);
-            erc.balances.insert((alice(), 2), &20);
-            erc.balances.insert((bob(), 1), &10);
+            let mut erc = SubArtTradable::new(alice());
+           
 
             erc
         }
