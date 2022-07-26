@@ -18,12 +18,12 @@ macro_rules! ensure {
 }
 #[ink::contract]
 pub mod sub_nft_factory_private {
-    use ink_lang as ink;
+    // use ink_lang as ink;
     use ink_lang::codegen::EmitEvent;
     use ink_prelude::string::String;
-    use ink_prelude::vec::Vec;
+    // use ink_prelude::vec::Vec;
     use ink_storage::{
-        traits::{PackedLayout, SpreadAllocate, SpreadLayout},
+        traits::{ SpreadAllocate},
         Mapping,
     };
     use scale::{Decode, Encode};
@@ -59,6 +59,7 @@ pub mod sub_nft_factory_private {
         NFTContractAlreadyRegistered,
         NotAnERC721Contract,
         NFTContractIsNotRegistered,
+TransactionFailed,
     }
 
     // The SubNFTFactory result types.
@@ -172,8 +173,7 @@ pub mod sub_nft_factory_private {
                     .is_ok(),
                 Error::TransferFailed
             );
-            let mut ans_contract_addr = AccountId::from([0x0; 32]);
-            #[cfg(not(test))]
+            let instantiate_contract = ||->Result<AccountId>{ #[cfg(not(test))]
             {
                 use sub_nft_tradable_private::SubNFTTradablePrivateRef;
                 let total_balance = Self::env().balance();
@@ -200,12 +200,14 @@ pub mod sub_nft_factory_private {
                 let _r = sub_nft_tradable_private_instance.transfer_ownership(self.env().caller());
                 ensure!(_r.is_ok(), Error::TransferOwnershipFailed);
 
-                ans_contract_addr = contract_addr;
-            }
+                 Ok(contract_addr)
+            }};
+            let  ans_contract_addr = instantiate_contract()?;
+
             self.exists.insert(&ans_contract_addr, &true);
             self.env().emit_event(ContractCreated {
                 creator: self.env().caller(),
-                nft: ans_contract_addr,
+                nft_address: ans_contract_addr,
             });
             Ok(ans_contract_addr)
         }
@@ -227,7 +229,7 @@ pub mod sub_nft_factory_private {
             self.exists.insert(&token_contract, &true);
             self.env().emit_event(ContractCreated {
                 creator: self.env().caller(),
-                nft: token_contract,
+                nft_address: token_contract,
             });
             Ok(())
         }
@@ -245,7 +247,7 @@ pub mod sub_nft_factory_private {
             self.exists.insert(&token_contract, &false);
             self.env().emit_event(ContractDisabled {
                 caller: self.env().caller(),
-                nft: token_contract,
+                nft_address: token_contract,
             });
             Ok(())
         }
@@ -255,13 +257,10 @@ pub mod sub_nft_factory_private {
         }
         #[cfg_attr(test, allow(unused_variables))]
         fn supports_interface_check(&self, callee: AccountId, data: [u8; 4]) -> bool {
-            // This is disabled during tests due to the use of `invoke_contract()` not being
-            // supported (tests end up panicking).
-            let mut ans = false;
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0xE6, 0x11, 0x3A, 0x8A];//supports_interface_check 
+                let selector: [u8; 4] = [0xE6, 0x11, 0x3A, 0x8A]; //supports_interface_check
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -274,9 +273,8 @@ pub mod sub_nft_factory_private {
                     .returns::<bool>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                ans = result.unwrap_or(false);
+                 result.unwrap_or(false)
             }
-            ans
         }
     }
 
@@ -285,10 +283,121 @@ pub mod sub_nft_factory_private {
     mod tests {
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
-        use ink_lang as ink;
+        // use ink_lang as ink;
 
         fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
+        }
+        fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
+            ink_env::test::default_accounts::<Environment>()
+        }
+
+        fn alice() -> AccountId {
+            default_accounts().alice
+        }
+
+        fn bob() -> AccountId {
+            default_accounts().bob
+        }
+
+        fn charlie() -> AccountId {
+            default_accounts().charlie
+        }
+
+        fn init_contract() -> Contract {
+            let mut erc = Contract::new();
+            erc.balances.insert((alice(), 1), &10);
+            erc.balances.insert((alice(), 2), &20);
+            erc.balances.insert((bob(), 1), &10);
+
+            erc
+        }
+
+        fn assert_contract_created_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_creator: AccountId,
+            expected_nft_address: AccountId,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::ContractCreated(ContractCreated { token }) = decoded_event {
+                assert_eq!(
+                    creator, expected_creator,
+                    "encountered invalid ContractCreated.creator"
+                );
+                assert_eq!(
+                    nft_address, expected_nft_address,
+                    "encountered invalid ContractCreated.nft_address"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a ContractCreated event")
+            }
+        }
+
+        fn assert_contract_disabled_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_caller: AccountId,
+            expected_nft_address: AccountId,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::ContractDisabled(ContractDisabled { token }) = decoded_event {
+                assert_eq!(
+                    caller, expected_caller,
+                    "encountered invalid ContractDisabled.caller"
+                );
+                assert_eq!(
+                    nft_address, expected_nft_address,
+                    "encountered invalid ContractDisabled.nft_address"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a ContractDisabled event")
+            }
+        }
+
+        /// For calculating the event topic hash.
+        struct PrefixedValue<'a, 'b, T> {
+            pub prefix: &'a [u8],
+            pub value: &'b T,
+        }
+
+        impl<X> scale::Encode for PrefixedValue<'_, '_, X>
+        where
+            X: scale::Encode,
+        {
+            #[inline]
+            fn size_hint(&self) -> usize {
+                self.prefix.size_hint() + self.value.size_hint()
+            }
+
+            #[inline]
+            fn encode_to<T: scale::Output + ?Sized>(&self, dest: &mut T) {
+                self.prefix.encode_to(dest);
+                self.value.encode_to(dest);
+            }
+        }
+
+        fn encoded_into_hash<T>(entity: &T) -> Hash
+        where
+            T: scale::Encode,
+        {
+            use ink_env::{
+                hash::{Blake2x256, CryptoHash, HashOutput},
+                Clear,
+            };
+            let mut result = Hash::clear();
+            let len_result = result.as_ref().len();
+            let encoded = entity.encode();
+            let len_encoded = encoded.len();
+            if len_encoded <= len_result {
+                result.as_mut()[..len_encoded].copy_from_slice(&encoded);
+                return result;
+            }
+            let mut hash_output = <<Blake2x256 as HashOutput>::Type as Default>::default();
+            <Blake2x256 as CryptoHash>::hash(&encoded, &mut hash_output);
+            let copy_len = core::cmp::min(hash_output.len(), len_result);
+            result.as_mut()[0..copy_len].copy_from_slice(&hash_output[0..copy_len]);
+            result
         }
     }
 }

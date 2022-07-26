@@ -21,12 +21,11 @@ macro_rules! ensure {
 pub mod sub_address_registry {
     pub type TokenId = u128;
 
-    use ink_lang as ink;
-    use ink_prelude::string::String;
-    use ink_prelude::vec::Vec;
+    // use ink_lang as ink;
+    // use ink_prelude::string::String;
+    // use ink_prelude::vec::Vec;
     use ink_storage::{
-        traits::{PackedLayout, SpreadAllocate, SpreadLayout},
-        Mapping,
+        traits::{SpreadAllocate},
     };
     use scale::{Decode, Encode};
 
@@ -61,7 +60,7 @@ pub mod sub_address_registry {
     pub enum Error {
         OnlyOwner,
         NotERC721,
-TransactionFailed,
+        TransactionFailed,
     }
 
     // The SubAddressRegistry result types.
@@ -101,13 +100,10 @@ TransactionFailed,
         }
         #[cfg_attr(test, allow(unused_variables))]
         fn supports_interface_check(&self, callee: AccountId, data: [u8; 4]) -> bool {
-            // This is disabled during tests due to the use of `invoke_contract()` not being
-            // supported (tests end up panicking).
-            let mut ans = false;
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0xE6, 0x11, 0x3A, 0x8A];//supports_interface_check 
+                let selector: [u8; 4] = [0xE6, 0x11, 0x3A, 0x8A]; //supports_interface_check
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -120,9 +116,8 @@ TransactionFailed,
                     .returns::<bool>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                ans = result.unwrap_or(false);
+                result.unwrap_or(false)
             }
-            ans
         }
         /**
         @notice Update Auction contract

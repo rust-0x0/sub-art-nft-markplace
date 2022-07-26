@@ -195,7 +195,7 @@ pub mod sub_art_tradable {
     const INTERFACE_ID_ERC1155: [u8; 4] = [0xD9, 0xB6, 0x7A, 0x26];
 
     use super::*;
-    use ink_lang as ink;
+    // use ink_lang as ink;
     use ink_prelude::string::String;
     use ink_prelude::vec::Vec;
     use ink_storage::{traits::SpreadAllocate, Mapping};
@@ -206,12 +206,12 @@ pub mod sub_art_tradable {
     #[ink(event)]
     pub struct ContractCreated {
         pub creator: AccountId,
-        pub nft: AccountId,
+        pub nft_address: AccountId,
     }
     #[ink(event)]
     pub struct ContractDisabled {
         pub caller: AccountId,
-        pub nft: AccountId,
+        pub nft_address: AccountId,
     }
 
     /// Indicate that a token transfer has occured.

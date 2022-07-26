@@ -16,10 +16,10 @@ macro_rules! ensure {
 }
 #[ink::contract]
 mod sub_token_registry {
-    use ink_lang as ink;
-    use ink_prelude::string::String;
+    // use ink_lang as ink;
+    // use ink_prelude::string::String;
     use ink_storage::{
-        traits::{PackedLayout, SpreadAllocate, SpreadLayout},
+        traits::{SpreadAllocate},
         Mapping,
     };
     use scale::{Decode, Encode};
@@ -114,6 +114,106 @@ mod sub_token_registry {
 
         fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
+        }
+        fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
+            ink_env::test::default_accounts::<Environment>()
+        }
+
+        fn alice() -> AccountId {
+            default_accounts().alice
+        }
+
+        fn bob() -> AccountId {
+            default_accounts().bob
+        }
+
+        fn charlie() -> AccountId {
+            default_accounts().charlie
+        }
+
+        fn init_contract() -> Contract {
+            let mut erc = Contract::new();
+            erc.balances.insert((alice(), 1), &10);
+            erc.balances.insert((alice(), 2), &20);
+            erc.balances.insert((bob(), 1), &10);
+
+            erc
+        }
+        fn assert_token_added_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_token: AccountId,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::TokenAdded(TokenAdded { token }) = decoded_event {
+                assert_eq!(
+                    token, expected_token,
+                    "encountered invalid TokenAdded.token"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a TokenAdded event")
+            }
+        }
+
+        fn assert_token_removed_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_token: AccountId,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::TokenRemoved(TokenRemoved { token }) = decoded_event {
+                assert_eq!(
+                    token, expected_token,
+                    "encountered invalid TokenRemoved.token"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a TokenRemoved event")
+            }
+        }
+
+        /// For calculating the event topic hash.
+        struct PrefixedValue<'a, 'b, T> {
+            pub prefix: &'a [u8],
+            pub value: &'b T,
+        }
+
+        impl<X> scale::Encode for PrefixedValue<'_, '_, X>
+        where
+            X: scale::Encode,
+        {
+            #[inline]
+            fn size_hint(&self) -> usize {
+                self.prefix.size_hint() + self.value.size_hint()
+            }
+
+            #[inline]
+            fn encode_to<T: scale::Output + ?Sized>(&self, dest: &mut T) {
+                self.prefix.encode_to(dest);
+                self.value.encode_to(dest);
+            }
+        }
+
+        fn encoded_into_hash<T>(entity: &T) -> Hash
+        where
+            T: scale::Encode,
+        {
+            use ink_env::{
+                hash::{Blake2x256, CryptoHash, HashOutput},
+                Clear,
+            };
+            let mut result = Hash::clear();
+            let len_result = result.as_ref().len();
+            let encoded = entity.encode();
+            let len_encoded = encoded.len();
+            if len_encoded <= len_result {
+                result.as_mut()[..len_encoded].copy_from_slice(&encoded);
+                return result;
+            }
+            let mut hash_output = <<Blake2x256 as HashOutput>::Type as Default>::default();
+            <Blake2x256 as CryptoHash>::hash(&encoded, &mut hash_output);
+            let copy_len = core::cmp::min(hash_output.len(), len_result);
+            result.as_mut()[0..copy_len].copy_from_slice(&hash_output[0..copy_len]);
+            result
         }
     }
 }

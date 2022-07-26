@@ -19,7 +19,7 @@ macro_rules! ensure {
 }
 #[ink::contract]
 pub mod sub_auction {
-    use ink_lang as ink;
+    // use ink_lang as ink;
     use ink_storage::{
         traits::{PackedLayout, SpreadAllocate, SpreadLayout},
         Mapping,
@@ -375,7 +375,6 @@ pub mod sub_auction {
             &mut self,
             nft_address: AccountId,
             token_id: TokenId,
-            bid_amount: Balance,
         ) -> Result<()> {
             ensure!(!self.is_paused, Error::ContractPaused);
             let highest_bid = self.highest_bids.get(&(nft_address, token_id)).unwrap();
@@ -415,7 +414,6 @@ pub mod sub_auction {
             &mut self,
             nft_address: AccountId,
             token_id: TokenId,
-            bid_amount: Balance,
         ) -> Result<()> {
             // Check the auction to see if it can be resulted
 
@@ -485,7 +483,7 @@ pub mod sub_auction {
                 // Send remaining to designer
                 pay_amount -= platform_fee_above_reserve;
             }
-            let (mut minter, mut royalty) =
+            let ( minter,  royalty) =
                 self.get_marketplace_minters_royalties(nft_address, token_id)?;
             if minter != AccountId::from([0x0; 32]) && royalty != 0 {
                 let royalty_fee = pay_amount * royalty / 10000;
@@ -557,7 +555,7 @@ pub mod sub_auction {
                 .is_ok(),
                 Error::NotOwneAndOrContractNotApproved
             );
-            let mut unit_price = self.get_bundle_marketplace_unit_price(nft_address, token_id)?;
+            let unit_price = self.get_bundle_marketplace_unit_price(nft_address, token_id)?;
 
             self.env().emit_event(AuctionResulted {
                 old_owner: self.env().caller(),
@@ -602,7 +600,7 @@ pub mod sub_auction {
                 self.highest_bids.remove(&(nft_address, token_id))
             }
 
-            let auction = self.auctions.remove(&(nft_address, token_id));
+            self.auctions.remove(&(nft_address, token_id));
 
             self.env().emit_event(AuctionCancelled {
                 nft_address,
@@ -896,11 +894,10 @@ pub mod sub_auction {
             Ok(())
         }
         fn erc20_balance_of(&mut self, token: AccountId, owner: AccountId) -> Result<Balance> {
-            let mut ans = Balance::default();
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x0F, 0x75, 0x5A, 0x56]; //erc20 balance_of 
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0x0F, 0x75, 0x5A, 0x56]; //erc20 balance_of
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -913,9 +910,8 @@ pub mod sub_auction {
                     .returns::<Balance>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                ans = result?;
+                    result
             }
-            Ok(ans)
         }
     }
     #[ink(impl)]
@@ -1138,10 +1134,9 @@ pub mod sub_auction {
         }
         #[cfg_attr(test, allow(unused_variables))]
         fn token_registry_enabled(&self, callee: AccountId, token: AccountId) -> Result<bool> {
-            let mut ans = false;
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                use ink_env::call::{build_call, Call, ExecutionInput};
                 let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C]; // token_registry_enabled
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
@@ -1155,9 +1150,8 @@ pub mod sub_auction {
                     .returns::<bool>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                ans = result?;
+                 result
             }
-            Ok(ans)
         }
         fn erc721_transfer_from(
             &mut self,
@@ -1168,7 +1162,7 @@ pub mod sub_auction {
         ) -> Result<()> {
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                use ink_env::call::{build_call, Call, ExecutionInput};
                 let selector: [u8; 4] = [0x0B, 0x39, 0x6F, 0x18]; //erc721 transfer_from
                 let (gas_limit, transferred_value) = (0, 0);
                 let _ = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
@@ -1200,7 +1194,7 @@ pub mod sub_auction {
         ) -> Result<()> {
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                use ink_env::call::{build_call, Call, ExecutionInput};
                 let selector: [u8; 4] = [0x0B, 0x39, 0x6F, 0x18]; //erc20 transfer_from
                 let (gas_limit, transferred_value) = (0, 0);
                 let _ = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
@@ -1230,7 +1224,7 @@ pub mod sub_auction {
         ) -> Result<()> {
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                use ink_env::call::{build_call, Call, ExecutionInput};
                 let selector: [u8; 4] = [0x84, 0xA1, 0x5D, 0xA1]; //erc20 transfer
                 let (gas_limit, transferred_value) = (0, 0);
                 let _ = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
@@ -1257,10 +1251,9 @@ pub mod sub_auction {
             owner: AccountId,
             operator: AccountId,
         ) -> Result<bool> {
-            let mut ans = false;
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                use ink_env::call::{build_call, Call, ExecutionInput};
                 let selector: [u8; 4] = [0x0F, 0x59, 0x22, 0xE9]; //erc721 is_approved_for_all
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
@@ -1278,9 +1271,8 @@ pub mod sub_auction {
                     .returns::<bool>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                ans = result?;
+                 result
             }
-            Ok(ans)
         }
 
         fn erc721_owner_of(
@@ -1288,10 +1280,9 @@ pub mod sub_auction {
             token: AccountId,
             token_id: TokenId,
         ) -> Result<Option<AccountId>> {
-            let mut ans = None;
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                use ink_env::call::{build_call, Call, ExecutionInput};
                 let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //erc721 owner_of
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
@@ -1305,10 +1296,9 @@ pub mod sub_auction {
                     .returns::<Option<AccountId>>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                ans = result?;
+                 result
             }
-            Ok(ans)
-        }
+ }
 
         fn ensure_erc721_is_approved_for_all(
             &self,
@@ -1349,7 +1339,6 @@ pub mod sub_auction {
             nft_address: AccountId,
             token_id: TokenId,
         ) -> Result<(AccountId, Balance)> {
-            let mut ans = (AccountId::from([0x0; 32]), 0);
             #[cfg(not(test))]
             {
                 let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
@@ -1364,9 +1353,8 @@ pub mod sub_auction {
                     nft_address,
                     token_id,
                 )?;
-                ans = (minter, royalty);
+                 Ok((minter, royalty))
             }
-            Ok(ans)
         }
         fn marketplace_minters(
             &self,
@@ -1374,10 +1362,9 @@ pub mod sub_auction {
             nft_address: AccountId,
             token_id: TokenId,
         ) -> Result<AccountId> {
-            let mut ans = AccountId::from([0x0; 32]);
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                use ink_env::call::{build_call, Call, ExecutionInput};
                 let selector: [u8; 4] = [0x4B, 0x4C, 0x7E, 0xC9]; //marketplace_minter_of
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
@@ -1395,9 +1382,8 @@ pub mod sub_auction {
                     .returns::<AccountId>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                ans = result?;
+                 result
             }
-            Ok(ans)
         }
 
         fn marketplace_royalties(
@@ -1406,11 +1392,10 @@ pub mod sub_auction {
             nft_address: AccountId,
             token_id: TokenId,
         ) -> Result<Balance> {
-            let mut ans = 0;
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x13, 0x5B, 0x72, 0xF2]; //marketplace royalty_of 
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0x13, 0x5B, 0x72, 0xF2]; //marketplace royalty_of
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -1427,15 +1412,13 @@ pub mod sub_auction {
                     .returns::<Balance>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                ans = result?;
+                 result
             }
-            Ok(ans)
         }
         fn get_marketplace_collection_royalties(
             &self,
             nft_address: AccountId,
         ) -> Result<(AccountId, Balance)> {
-            let mut ans = (AccountId::from([0x0; 32]), 0);
             #[cfg(not(test))]
             {
                 let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
@@ -1444,20 +1427,18 @@ pub mod sub_auction {
                     address_registry_instance.marketplace(),
                     nft_address,
                 )?;
-                ans = (minter, royalty);
+               Ok((minter, royalty))
             }
-            Ok(ans)
         }
         fn marketplace_collection_royalties(
             &self,
             token: AccountId,
             nft_address: AccountId,
         ) -> Result<(AccountId, Balance)> {
-            let mut ans = (AccountId::from([0x0; 32]), 0);
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0xAA, 0xFC, 0xD7, 0xEA]; //marketplace_collection_royalties 
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0xAA, 0xFC, 0xD7, 0xEA]; //marketplace_collection_royalties
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -1470,16 +1451,14 @@ pub mod sub_auction {
                     .returns::<(AccountId, Balance)>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                ans = result?;
+                 result
             }
-            Ok(ans)
         }
         fn get_bundle_marketplace_unit_price(
             &self,
             nft_address: AccountId,
             token_id: TokenId,
         ) -> Result<Balance> {
-            let mut ans = Balance::default();
             #[cfg(not(test))]
             {
                 let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
@@ -1494,12 +1473,10 @@ pub mod sub_auction {
                     token_id,
                 )?;
 
-                let unit_price = self
-                    .marketplace_get_price(address_registry_instance.marketplace(), nft_address)?;
-                ans = unit_price;
+                 self
+                    .marketplace_get_price(address_registry_instance.marketplace(), nft_address)
             }
 
-            Ok(ans)
         }
         fn bundle_marketplace_validate_item_sold(
             &self,
@@ -1509,8 +1486,8 @@ pub mod sub_auction {
         ) -> Result<()> {
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x5E, 0x38, 0x31, 0x94]; //bundle_marketplace_validate_item_sold 
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0x5E, 0x38, 0x31, 0x94]; //bundle_marketplace_validate_item_sold
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -1537,11 +1514,10 @@ pub mod sub_auction {
             token: AccountId,
             nft_address: AccountId,
         ) -> Result<Balance> {
-            let mut ans = 0;
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0xF2, 0x3D, 0x4B, 0x6C]; //marketplace_get_price  
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0xF2, 0x3D, 0x4B, 0x6C]; //marketplace_get_price
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -1554,9 +1530,8 @@ pub mod sub_auction {
                     .returns::<Balance>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                ans = result?;
+                 result
             }
-            Ok(ans)
         }
     }
     /// Unit tests
@@ -1568,6 +1543,747 @@ pub mod sub_auction {
 
         fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
+        }
+        fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
+            ink_env::test::default_accounts::<Environment>()
+        }
+
+        fn alice() -> AccountId {
+            default_accounts().alice
+        }
+
+        fn bob() -> AccountId {
+            default_accounts().bob
+        }
+
+        fn charlie() -> AccountId {
+            default_accounts().charlie
+        }
+
+        fn init_contract() -> Contract {
+            let mut erc = Contract::new();
+            erc.balances.insert((alice(), 1), &10);
+            erc.balances.insert((alice(), 2), &20);
+            erc.balances.insert((bob(), 1), &10);
+
+            erc
+        }
+        fn assert_sub_auction_contract_deployed_event(event: &ink_env::test::EmittedEvent) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::SubAuctionContractDeployed(SubAuctionContractDeployed {}) = decoded_event
+            {
+            } else {
+                panic!("encountered unexpected event kind: expected a SubAuctionContractDeployed event")
+            }
+        }
+
+        fn assert_pause_toggled_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_is_paused: bool,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::PauseToggled(PauseToggled { is_paused }) = decoded_event {
+                assert_eq!(
+                    is_paused, expected_is_paused,
+                    "encountered invalid PauseToggled.is_paused"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a PauseToggled event")
+            }
+        }
+
+        fn assert_auction_created_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_nft_address: AccountId,
+            expected_token_id: TokenId,
+            expected_pay_token: AccountId,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::AuctionCreated(AuctionCreated {
+                nft_address,
+                token_id,
+                pay_token,
+            }) = decoded_event
+            {
+                assert_eq!(
+                    nft_address, expected_nft_address,
+                    "encountered invalid AuctionCreated.nft_address"
+                );
+                assert_eq!(
+                    token_id, expected_token_id,
+                    "encountered invalid AuctionCreated.token_id"
+                );
+                assert_eq!(
+                    pay_token, expected_pay_token,
+                    "encountered invalid AuctionCreated.pay_token"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a AuctionCreated event")
+            }
+            let expected_topics = vec![
+                encoded_into_hash(&PrefixedValue {
+                    value: b"SubAuction::AuctionCreated",
+                    prefix: b"",
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::AuctionCreated::nft_address",
+                    value: &expected_nft_address,
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::AuctionCreated::token_id",
+                    value: &expected_token_id,
+                }),
+            ];
+
+            let topics = event.topics.clone();
+            for (n, (actual_topic, expected_topic)) in
+                topics.iter().zip(expected_topics).enumerate()
+            {
+                let mut topic_hash = Hash::clear();
+                let len = actual_topic.len();
+                topic_hash.as_mut()[0..len].copy_from_slice(&actual_topic[0..len]);
+
+                assert_eq!(
+                    topic_hash, expected_topic,
+                    "encountered invalid topic at {}",
+                    n
+                );
+            }
+        }
+        fn assert_update_auction_end_time_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_nft_address: AccountId,
+            expected_token_id: TokenId,
+            expected_end_time: u128,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::UpdateAuctionEndTime(UpdateAuctionEndTime {
+                nft_address,
+                token_id,
+                end_time,
+            }) = decoded_event
+            {
+                assert_eq!(
+                    nft_address, expected_nft_address,
+                    "encountered invalid UpdateAuctionEndTime.nft_address"
+                );
+                assert_eq!(
+                    token_id, expected_token_id,
+                    "encountered invalid UpdateAuctionEndTime.token_id"
+                );
+                assert_eq!(
+                    end_time, expected_end_time,
+                    "encountered invalid UpdateAuctionEndTime.end_time"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a UpdateAuctionEndTime event")
+            }
+            let expected_topics = vec![
+                encoded_into_hash(&PrefixedValue {
+                    value: b"SubAuction::UpdateAuctionEndTime",
+                    prefix: b"",
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::UpdateAuctionEndTime::nft_address",
+                    value: &expected_nft_address,
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::UpdateAuctionEndTime::token_id",
+                    value: &expected_token_id,
+                }),
+            ];
+
+            let topics = event.topics.clone();
+            for (n, (actual_topic, expected_topic)) in
+                topics.iter().zip(expected_topics).enumerate()
+            {
+                let mut topic_hash = Hash::clear();
+                let len = actual_topic.len();
+                topic_hash.as_mut()[0..len].copy_from_slice(&actual_topic[0..len]);
+
+                assert_eq!(
+                    topic_hash, expected_topic,
+                    "encountered invalid topic at {}",
+                    n
+                );
+            }
+        }
+
+        fn assert_update_auction_start_time_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_nft_address: AccountId,
+            expected_token_id: TokenId,
+            expected_start_time: u128,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::UpdateAuctionStartTime(UpdateAuctionStartTime {
+                nft_address,
+                token_id,
+                start_time,
+            }) = decoded_event
+            {
+                assert_eq!(
+                    nft_address, expected_nft_address,
+                    "encountered invalid UpdateAuctionStartTime.nft_address"
+                );
+                assert_eq!(
+                    token_id, expected_token_id,
+                    "encountered invalid UpdateAuctionStartTime.token_id"
+                );
+                assert_eq!(
+                    start_time, expected_start_time,
+                    "encountered invalid UpdateAuctionStartTime.start_time"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a UpdateAuctionStartTime event")
+            }
+            let expected_topics = vec![
+                encoded_into_hash(&PrefixedValue {
+                    value: b"SubAuction::UpdateAuctionStartTime",
+                    prefix: b"",
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::UpdateAuctionStartTime::nft_address",
+                    value: &expected_nft_address,
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::UpdateAuctionStartTime::token_id",
+                    value: &expected_token_id,
+                }),
+            ];
+
+            let topics = event.topics.clone();
+            for (n, (actual_topic, expected_topic)) in
+                topics.iter().zip(expected_topics).enumerate()
+            {
+                let mut topic_hash = Hash::clear();
+                let len = actual_topic.len();
+                topic_hash.as_mut()[0..len].copy_from_slice(&actual_topic[0..len]);
+
+                assert_eq!(
+                    topic_hash, expected_topic,
+                    "encountered invalid topic at {}",
+                    n
+                );
+            }
+        }
+
+        fn assert_update_auction_reserve_price_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_nft_address: AccountId,
+            expected_token_id: TokenId,
+            expected_pay_token: AccountId,
+
+            expected_reserve_price: u128,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::UpdateAuctionReservePrice(UpdateAuctionReservePrice {
+                nft_address,
+                token_id,
+                pay_token,
+                reserve_price,
+            }) = decoded_event
+            {
+                assert_eq!(
+                    nft_address, expected_nft_address,
+                    "encountered invalid UpdateAuctionReservePrice.nft_address"
+                );
+                assert_eq!(
+                    token_id, expected_token_id,
+                    "encountered invalid UpdateAuctionReservePrice.token_id"
+                );
+                assert_eq!(
+                    pay_token, expected_pay_token,
+                    "encountered invalid UpdateAuctionReservePrice.pay_token"
+                );
+                assert_eq!(
+                    reserve_price, expected_reserve_price,
+                    "encountered invalid UpdateAuctionReservePrice.reserve_price"
+                );
+            } else {
+                panic!(
+                    "encountered unexpected event kind: expected a UpdateAuctionReservePrice event"
+                )
+            }
+            let expected_topics = vec![
+                encoded_into_hash(&PrefixedValue {
+                    value: b"SubAuction::UpdateAuctionReservePrice",
+                    prefix: b"",
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::UpdateAuctionReservePrice::nft_address",
+                    value: &expected_nft_address,
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::UpdateAuctionReservePrice::token_id",
+                    value: &expected_token_id,
+                }),
+            ];
+
+            let topics = event.topics.clone();
+            for (n, (actual_topic, expected_topic)) in
+                topics.iter().zip(expected_topics).enumerate()
+            {
+                let mut topic_hash = Hash::clear();
+                let len = actual_topic.len();
+                topic_hash.as_mut()[0..len].copy_from_slice(&actual_topic[0..len]);
+
+                assert_eq!(
+                    topic_hash, expected_topic,
+                    "encountered invalid topic at {}",
+                    n
+                );
+            }
+        }
+        fn assert_platform_fee_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_platform_fee: bool,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::UpdatePlatformFee(UpdatePlatformFee { platform_fee }) = decoded_event {
+                assert_eq!(
+                    platform_fee, expected_platform_fee,
+                    "encountered invalid UpdatePlatformFee.platform_fee"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a UpdatePlatformFee event")
+            }
+        }
+
+        fn assert_platform_fee_recipient_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_fee_recipient: bool,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::UpdatePlatformFeeRecipient(UpdatePlatformFeeRecipient { fee_recipient }) =
+                decoded_event
+            {
+                assert_eq!(
+                    fee_recipient, expected_fee_recipient,
+                    "encountered invalid UpdatePlatformFeeRecipient.fee_recipient"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a UpdatePlatformFeeRecipient event")
+            }
+        }
+
+        fn assert_update_min_bid_increment_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_min_bid_increment: bool,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::UpdateMinBidIncrement(UpdateMinBidIncrement { min_bid_increment }) =
+                decoded_event
+            {
+                assert_eq!(
+                    min_bid_increment, expected_min_bid_increment,
+                    "encountered invalid UpdateMinBidIncrement.min_bid_increment"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a UpdateMinBidIncrement event")
+            }
+        }
+
+        fn assert_update_bid_withdrawal_lock_time_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_bid_withdrawal_lock_time: bool,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::UpdateBidWithdrawalLockTime(UpdateBidWithdrawalLockTime {
+                bid_withdrawal_lock_time,
+            }) = decoded_event
+            {
+                assert_eq!(
+                    bid_withdrawal_lock_time, expected_bid_withdrawal_lock_time,
+                    "encountered invalid UpdateBidWithdrawalLockTime.bid_withdrawal_lock_time"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a UpdateBidWithdrawalLockTime event")
+            }
+        }
+
+        fn assert_bid_placed_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_nft_address: AccountId,
+            expected_token_id: TokenId,
+            expected_bidder: AccountId,
+            expected_bid: Balance,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::BidPlaced(BidPlaced {
+                nft_address,
+                token_id,
+                bidder,
+                bid,
+            }) = decoded_event
+            {
+                assert_eq!(
+                    nft_address, expected_nft_address,
+                    "encountered invalid BidPlaced.nft_address"
+                );
+                assert_eq!(
+                    token_id, expected_token_id,
+                    "encountered invalid BidPlaced.token_id"
+                );
+                assert_eq!(bidder, bidder, "encountered invalid BidPlaced.bidder");
+                assert_eq!(
+                    reserve_bid, expected_bid,
+                    "encountered invalid BidPlaced.bid"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a BidPlaced event")
+            }
+            let expected_topics = vec![
+                encoded_into_hash(&PrefixedValue {
+                    value: b"SubAuction::BidPlaced",
+                    prefix: b"",
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::BidPlaced::nft_address",
+                    value: &expected_nft_address,
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::BidPlaced::token_id",
+                    value: &expected_token_id,
+                }),
+            ];
+
+            let topics = event.topics.clone();
+            for (n, (actual_topic, expected_topic)) in
+                topics.iter().zip(expected_topics).enumerate()
+            {
+                let mut topic_hash = Hash::clear();
+                let len = actual_topic.len();
+                topic_hash.as_mut()[0..len].copy_from_slice(&actual_topic[0..len]);
+
+                assert_eq!(
+                    topic_hash, expected_topic,
+                    "encountered invalid topic at {}",
+                    n
+                );
+            }
+        }
+
+        fn assert_bid_withdrawn_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_nft_address: AccountId,
+            expected_token_id: TokenId,
+            expected_bidder: AccountId,
+            expected_bid: Balance,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::BidWithdrawn(BidWithdrawn {
+                nft_address,
+                token_id,
+                bidder,
+                bid,
+            }) = decoded_event
+            {
+                assert_eq!(
+                    nft_address, expected_nft_address,
+                    "encountered invalid BidWithdrawn.nft_address"
+                );
+                assert_eq!(
+                    token_id, expected_token_id,
+                    "encountered invalid BidWithdrawn.token_id"
+                );
+                assert_eq!(bidder, bidder, "encountered invalid BidWithdrawn.bidder");
+                assert_eq!(
+                    reserve_bid, expected_bid,
+                    "encountered invalid BidWithdrawn.bid"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a BidWithdrawn event")
+            }
+            let expected_topics = vec![
+                encoded_into_hash(&PrefixedValue {
+                    value: b"SubAuction::BidWithdrawn",
+                    prefix: b"",
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::BidWithdrawn::nft_address",
+                    value: &expected_nft_address,
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::BidWithdrawn::token_id",
+                    value: &expected_token_id,
+                }),
+            ];
+
+            let topics = event.topics.clone();
+            for (n, (actual_topic, expected_topic)) in
+                topics.iter().zip(expected_topics).enumerate()
+            {
+                let mut topic_hash = Hash::clear();
+                let len = actual_topic.len();
+                topic_hash.as_mut()[0..len].copy_from_slice(&actual_topic[0..len]);
+
+                assert_eq!(
+                    topic_hash, expected_topic,
+                    "encountered invalid topic at {}",
+                    n
+                );
+            }
+        }
+
+        fn assert_bid_refunded_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_nft_address: AccountId,
+            expected_token_id: TokenId,
+            expected_bidder: AccountId,
+            expected_bid: Balance,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::BidRefunded(BidRefunded {
+                nft_address,
+                token_id,
+                bidder,
+                bid,
+            }) = decoded_event
+            {
+                assert_eq!(
+                    nft_address, expected_nft_address,
+                    "encountered invalid BidRefunded.nft_address"
+                );
+                assert_eq!(
+                    token_id, expected_token_id,
+                    "encountered invalid BidRefunded.token_id"
+                );
+                assert_eq!(bidder, bidder, "encountered invalid BidRefunded.bidder");
+                assert_eq!(
+                    reserve_bid, expected_bid,
+                    "encountered invalid BidRefunded.bid"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a BidRefunded event")
+            }
+            let expected_topics = vec![
+                encoded_into_hash(&PrefixedValue {
+                    value: b"SubAuction::BidRefunded",
+                    prefix: b"",
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::BidRefunded::nft_address",
+                    value: &expected_nft_address,
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::BidRefunded::token_id",
+                    value: &expected_token_id,
+                }),
+            ];
+
+            let topics = event.topics.clone();
+            for (n, (actual_topic, expected_topic)) in
+                topics.iter().zip(expected_topics).enumerate()
+            {
+                let mut topic_hash = Hash::clear();
+                let len = actual_topic.len();
+                topic_hash.as_mut()[0..len].copy_from_slice(&actual_topic[0..len]);
+
+                assert_eq!(
+                    topic_hash, expected_topic,
+                    "encountered invalid topic at {}",
+                    n
+                );
+            }
+        }
+
+        fn assert_auction_resulted_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_old_owner: AccountId,
+            expected_nft_address: AccountId,
+            expected_token_id: TokenId,
+            expected_winner: AccountId,
+            expected_pay_token: AccountId,
+            expected_unit_price: Balance,
+            expected_winning_bid: Balance,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::AuctionResulted(AuctionResulted {
+                old_owner,
+                nft_address,
+                token_id,
+                winner,
+                pay_token,
+                unit_price,
+                winning_bid,
+            }) = decoded_event
+            {
+                assert_eq!(
+                    old_owner, expected_old_owner,
+                    "encountered invalid AuctionResulted.old_owner"
+                );
+                assert_eq!(
+                    nft_address, expected_nft_address,
+                    "encountered invalid AuctionResulted.nft_address"
+                );
+                assert_eq!(
+                    token_id, expected_token_id,
+                    "encountered invalid AuctionResulted.token_id"
+                );
+                assert_eq!(
+                    winner, expected_winner,
+                    "encountered invalid AuctionResulted.winner"
+                );
+                assert_eq!(
+                    pay_token, expected_pay_token,
+                    "encountered invalid AuctionResulted.pay_token"
+                );
+                assert_eq!(
+                    unit_price, expected_unit_price,
+                    "encountered invalid AuctionResulted.unit_price"
+                );
+                assert_eq!(
+                    winning_bid, expected_winning_bid,
+                    "encountered invalid AuctionResulted.winning_bid"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a AuctionResulted event")
+            }
+            let expected_topics = vec![
+                encoded_into_hash(&PrefixedValue {
+                    value: b"SubAuction::AuctionResulted",
+                    prefix: b"",
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::AuctionResulted::nft_address",
+                    value: &expected_nft_address,
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::AuctionResulted::token_id",
+                    value: &expected_token_id,
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::AuctionResulted::winner",
+                    value: &expected_winner,
+                }),
+            ];
+
+            let topics = event.topics.clone();
+            for (n, (actual_topic, expected_topic)) in
+                topics.iter().zip(expected_topics).enumerate()
+            {
+                let mut topic_hash = Hash::clear();
+                let len = actual_topic.len();
+                topic_hash.as_mut()[0..len].copy_from_slice(&actual_topic[0..len]);
+
+                assert_eq!(
+                    topic_hash, expected_topic,
+                    "encountered invalid topic at {}",
+                    n
+                );
+            }
+        }
+        fn assert_auction_Cancelled_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_nft_address: AccountId,
+            expected_token_id: TokenId,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::AuctionCancelled(AuctionCancelled {
+                nft_address,
+                token_id,
+            }) = decoded_event
+            {
+                assert_eq!(
+                    nft_address, expected_nft_address,
+                    "encountered invalid AuctionCancelled.nft_address"
+                );
+                assert_eq!(
+                    token_id, expected_token_id,
+                    "encountered invalid AuctionCancelled.token_id"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a AuctionCancelled event")
+            }
+            let expected_topics = vec![
+                encoded_into_hash(&PrefixedValue {
+                    value: b"SubAuction::AuctionCancelled",
+                    prefix: b"",
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::AuctionCancelled::nft_address",
+                    value: &expected_nft_address,
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubAuction::AuctionCancelled::token_id",
+                    value: &expected_token_id,
+                }),
+            ];
+
+            let topics = event.topics.clone();
+            for (n, (actual_topic, expected_topic)) in
+                topics.iter().zip(expected_topics).enumerate()
+            {
+                let mut topic_hash = Hash::clear();
+                let len = actual_topic.len();
+                topic_hash.as_mut()[0..len].copy_from_slice(&actual_topic[0..len]);
+
+                assert_eq!(
+                    topic_hash, expected_topic,
+                    "encountered invalid topic at {}",
+                    n
+                );
+            }
+        }
+        /// For calculating the event topic hash.
+        struct PrefixedValue<'a, 'b, T> {
+            pub prefix: &'a [u8],
+            pub value: &'b T,
+        }
+
+        impl<X> scale::Encode for PrefixedValue<'_, '_, X>
+        where
+            X: scale::Encode,
+        {
+            #[inline]
+            fn size_hint(&self) -> usize {
+                self.prefix.size_hint() + self.value.size_hint()
+            }
+
+            #[inline]
+            fn encode_to<T: scale::Output + ?Sized>(&self, dest: &mut T) {
+                self.prefix.encode_to(dest);
+                self.value.encode_to(dest);
+            }
+        }
+
+        fn encoded_into_hash<T>(entity: &T) -> Hash
+        where
+            T: scale::Encode,
+        {
+            use ink_env::{
+                hash::{Blake2x256, CryptoHash, HashOutput},
+                Clear,
+            };
+            let mut result = Hash::clear();
+            let len_result = result.as_ref().len();
+            let encoded = entity.encode();
+            let len_encoded = encoded.len();
+            if len_encoded <= len_result {
+                result.as_mut()[..len_encoded].copy_from_slice(&encoded);
+                return result;
+            }
+            let mut hash_output = <<Blake2x256 as HashOutput>::Type as Default>::default();
+            <Blake2x256 as CryptoHash>::hash(&encoded, &mut hash_output);
+            let copy_len = core::cmp::min(hash_output.len(), len_result);
+            result.as_mut()[0..copy_len].copy_from_slice(&hash_output[0..copy_len]);
+            result
         }
     }
 }

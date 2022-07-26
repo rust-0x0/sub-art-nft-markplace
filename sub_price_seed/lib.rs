@@ -16,10 +16,10 @@ macro_rules! ensure {
 }
 #[ink::contract]
 mod sub_price_seed {
-    use ink_lang as ink;
-    use ink_prelude::string::String;
+    // use ink_lang as ink;
+    // use ink_prelude::string::String;
     use ink_storage::{
-        traits::{PackedLayout, SpreadAllocate, SpreadLayout},
+        traits::{SpreadAllocate},
         Mapping,
     };
     use scale::{Decode, Encode};
@@ -100,10 +100,9 @@ mod sub_price_seed {
         }
         #[cfg_attr(test, allow(unused_variables))]
         fn token_registry_enabled(&self, callee: AccountId, token: AccountId) -> Result<bool> {
-            let mut ans = false;
             #[cfg(not(test))]
             {
-                use ink_env::call::{build_call, Call, ExecutionInput, Selector};
+                use ink_env::call::{build_call, Call, ExecutionInput};
                 let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C]; //0x1414631c enabled
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
@@ -117,9 +116,8 @@ mod sub_price_seed {
                     .returns::<bool>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                ans = result?;
+                 result
             }
-            Ok(ans)
         }
         /**
         @notice Update oracle address for token
