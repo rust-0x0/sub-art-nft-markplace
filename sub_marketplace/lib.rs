@@ -262,28 +262,34 @@ mod sub_marketplace {
             ensure!(listing.quantity == 0, Error::AlreadyListed);
 
             if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
-     ensure!(
-                Some(self.env().caller()) == self.erc721_owner_of(nft_address, token_id)?,
-                Error::NotOwningItem
-            );
+                ensure!(
+                    Some(self.env().caller()) == self.erc721_owner_of(nft_address, token_id)?,
+                    Error::NotOwningItem
+                );
 
-            ensure!(
-                self.erc721_is_approved_for_all(nft_address,self.env().caller(),
-                    self.env().account_id(),)
+                ensure!(
+                    self.erc721_is_approved_for_all(
+                        nft_address,
+                        self.env().caller(),
+                        self.env().account_id(),
+                    )
                     .unwrap_or(false),
-                Error::ItemNotApproved
-            );
+                    Error::ItemNotApproved
+                );
             } else if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155) {
-     ensure!(
-                quantity <= self.erc1155_balance_of(nft_address, self.env().caller())?,
-                Error::MustHoldEnoughNFTs
-            );
-            ensure!(
-                self.erc1155_is_approved_for_all(nft_address,       self.env().caller(),
-                    self.env().account_id(),)
+                ensure!(
+                    quantity <= self.erc1155_balance_of(nft_address, self.env().caller())?,
+                    Error::MustHoldEnoughNFTs
+                );
+                ensure!(
+                    self.erc1155_is_approved_for_all(
+                        nft_address,
+                        self.env().caller(),
+                        self.env().account_id(),
+                    )
                     .is_ok(),
-                Error::ItemNotApproved
-            );
+                    Error::ItemNotApproved
+                );
             }
             self.valid_pay_token(pay_token)?;
             self.listings.insert(
@@ -707,7 +713,7 @@ mod sub_marketplace {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C]; //factory_exists
+                let selector: [u8; 4] = [0xCA, 0x94, 0x23, 0x1F]; //factory_exists 
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -764,15 +770,15 @@ mod sub_marketplace {
             quantity: u128,
         ) -> Result<()> {
             if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
-                       ensure!(
-                Some(self.env().caller()) == self.erc721_owner_of(nft_address, token_id)?,
-                Error::NotOwningItem
-            );
+                ensure!(
+                    Some(self.env().caller()) == self.erc721_owner_of(nft_address, token_id)?,
+                    Error::NotOwningItem
+                );
             } else if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155) {
-                     ensure!(
-                quantity <= self.erc1155_balance_of(nft_address, owner)?,
-                Error::NotOwningItem
-            );
+                ensure!(
+                    quantity <= self.erc1155_balance_of(nft_address, owner)?,
+                    Error::NotOwningItem
+                );
             } else {
                 ensure!(false, Error::InvalidNFTAddress);
             }
@@ -841,7 +847,7 @@ mod sub_marketplace {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C];//supports_interface
+                let selector: [u8; 4] = [0xE6, 0x11, 0x3A, 0x8A]; //supports_interface_check
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -940,6 +946,19 @@ mod sub_marketplace {
             });
             Ok(())
         }
+        #[ink(message)]
+        pub fn minter_of(&self, owner: AccountId, token_id: TokenId) -> AccountId {
+            self.minter_of_impl(owner,token_id)
+        }
+        #[ink(message)]
+        pub fn royalty_of(&self, nft_address: AccountId, token_id: TokenId) -> u128 {
+            self.royalty_of_impl(nft_address,token_id)
+        }
+         #[ink(message)]
+        pub fn collection_royalty_of(&self, nft_address: AccountId) -> (AccountId,Balance) {
+            let collection_royalty=self.collection_royalty_impl(nft_address);
+            (collection_royalty.fee_recipient,collection_royalty.royalty)
+        }      
     }
     #[ink(impl)]
     impl SubMarketplace {
@@ -965,7 +984,7 @@ mod sub_marketplace {
         /// Prefer to call this method over `allowance` since this
         /// works using references which are more efficient in Wasm.
         #[inline]
-        fn royalty_impl(&self, nft_address: AccountId, token_id: TokenId) -> u128 {
+        fn royalty_of_impl(&self, nft_address: AccountId, token_id: TokenId) -> u128 {
             self.royalties
                 .get(&(nft_address, token_id))
                 .unwrap_or_default()
@@ -1208,7 +1227,7 @@ mod sub_marketplace {
             }
             Ok(ans)
         }
-                 
+
         fn auction_start_time_resulted(
             &self,
             nft_address: AccountId,
@@ -1220,7 +1239,7 @@ mod sub_marketplace {
                 let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
                     ink_env::call::FromAccountId::from_account_id(self.address_registry);
                 use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0x16, 0x4B, 0x9B, 0xA0]; //auction get_auction_start_time_resulted
+                let selector: [u8; 4] = [0x39, 0xF0, 0xAB, 0x3E]; //auction get_auction_start_time_resulted 
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -1276,7 +1295,7 @@ mod sub_marketplace {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //_bundle_marketplace_validate_item_sold
+                let selector: [u8; 4] = [0x5E, 0x38, 0x31, 0x94]; //_bundle_marketplace_validate_item_sold
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(

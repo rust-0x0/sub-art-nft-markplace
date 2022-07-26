@@ -1378,7 +1378,7 @@ pub mod sub_auction {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //marketplace_minters
+                let selector: [u8; 4] = [0x4B, 0x4C, 0x7E, 0xC9]; //marketplace_minter_of
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -1410,7 +1410,7 @@ pub mod sub_auction {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //marketplace_royalties
+                let selector: [u8; 4] = [0x13, 0x5B, 0x72, 0xF2]; //marketplace royalty_of 
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -1457,7 +1457,7 @@ pub mod sub_auction {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //marketplace_collection_royalties
+                let selector: [u8; 4] = [0xAA, 0xFC, 0xD7, 0xEA]; //marketplace_collection_royalties 
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -1510,7 +1510,7 @@ pub mod sub_auction {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //bundle_marketplace_validate_item_sold
+                let selector: [u8; 4] = [0x5E, 0x38, 0x31, 0x94]; //bundle_marketplace_validate_item_sold 
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -1541,7 +1541,7 @@ pub mod sub_auction {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput, Selector};
-                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //marketplace_get_price
+                let selector: [u8; 4] = [0xF2, 0x3D, 0x4B, 0x6C]; //marketplace_get_price  
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(

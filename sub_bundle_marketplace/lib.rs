@@ -240,7 +240,7 @@ mod sub_bundle_marketplace {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C]; //0x1414631c enabled
+                let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C]; // token_registry_enabled
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -650,7 +650,7 @@ mod sub_bundle_marketplace {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //owner_of
+                let selector: [u8; 4] = [0x5E, 0x38, 0x31, 0x94]; //_marketplace_validate_item_sold
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -683,7 +683,7 @@ mod sub_bundle_marketplace {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0x36, 0x03, 0x4D, 0x3E]; //is_approved_for_all
+                let selector: [u8; 4] = [0x36, 0x03, 0x4D, 0x3E]; //erc1155 is_approved_for_all
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -714,7 +714,7 @@ mod sub_bundle_marketplace {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //owner_of
+                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //marketplace_get_price
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -881,7 +881,7 @@ mod sub_bundle_marketplace {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0x0B, 0x39, 0x6F, 0x18]; //transfer_from
+                let selector: [u8; 4] = [0x0B, 0x39, 0x6F, 0x18]; //erc721 transfer_from
                 let (gas_limit, transferred_value) = (0, 0);
                 let _ = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -913,7 +913,7 @@ mod sub_bundle_marketplace {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0x53, 0x24, 0xD5, 0x56]; //safe_transfer_from
+                let selector: [u8; 4] = [0x53, 0x24, 0xD5, 0x56]; //erc1155 safe_transfer_from
                 let (gas_limit, transferred_value) = (0, 0);
                 let _ = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -946,7 +946,7 @@ mod sub_bundle_marketplace {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0x0B, 0x39, 0x6F, 0x18]; //transfer_from
+                let selector: [u8; 4] = [0x0B, 0x39, 0x6F, 0x18]; //erc20 transfer_from
                 let (gas_limit, transferred_value) = (0, 0);
                 let _ = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -978,7 +978,7 @@ mod sub_bundle_marketplace {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0x0F, 0x59, 0x22, 0xE9]; //is_approved_for_all
+                let selector: [u8; 4] = [0x0F, 0x59, 0x22, 0xE9]; //erc721 is_approved_for_all
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -1009,7 +1009,7 @@ mod sub_bundle_marketplace {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //owner_of
+                let selector: [u8; 4] = [0x99, 0x72, 0x0C, 0x1E]; //erc721 owner_of
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -1073,7 +1073,7 @@ mod sub_bundle_marketplace {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0x16, 0x4B, 0x9B, 0xA0]; //balance_of
+                let selector: [u8; 4] = [0x16, 0x4B, 0x9B, 0xA0]; //erc1155 balance_of
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
@@ -1121,7 +1121,7 @@ mod sub_bundle_marketplace {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C];
+                let selector: [u8; 4] = [0xE6, 0x11, 0x3A, 0x8A];//supports_interface_check 
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(

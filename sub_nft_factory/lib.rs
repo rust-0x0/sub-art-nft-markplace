@@ -261,7 +261,7 @@ pub mod sub_nft_factory {
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C];//supports_interface
+                let selector: [u8; 4] = [0xE6, 0x11, 0x3A, 0x8A];//supports_interface_check 
                 let (gas_limit, transferred_value) = (0, 0);
                 let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
                     .call_type(
