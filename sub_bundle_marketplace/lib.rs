@@ -24,7 +24,7 @@ macro_rules! ensure {
 }
 #[ink::contract]
 mod sub_bundle_marketplace {
-    // use ink_lang as ink; 
+    // use ink_lang as ink;
     use ink_prelude::collections::BTreeSet;
     use ink_prelude::string::String;
     use ink_prelude::vec::Vec;
@@ -236,9 +236,9 @@ mod sub_bundle_marketplace {
 
         #[cfg_attr(test, allow(unused_variables))]
         fn token_registry_enabled(&self, callee: AccountId, token: AccountId) -> Result<bool> {
-     #[cfg(test)]
+            #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 Ok(false)
             }
             #[cfg(not(test))]
@@ -682,9 +682,9 @@ mod sub_bundle_marketplace {
             owner: AccountId,
             operator: AccountId,
         ) -> Result<bool> {
-     #[cfg(test)]
+            #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 Ok(false)
             }
             #[cfg(not(test))]
@@ -707,7 +707,7 @@ mod sub_bundle_marketplace {
                     .returns::<bool>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                 result
+                result
             }
         }
 
@@ -716,9 +716,9 @@ mod sub_bundle_marketplace {
             token: AccountId,
             nft_address: AccountId,
         ) -> Result<Balance> {
-     #[cfg(test)]
+            #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 Ok(Balance::default())
             }
             #[cfg(not(test))]
@@ -737,7 +737,7 @@ mod sub_bundle_marketplace {
                     .returns::<Balance>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                 result
+                result
             }
         }
         /// @notice Method for offering bundle item
@@ -983,9 +983,9 @@ mod sub_bundle_marketplace {
             owner: AccountId,
             operator: AccountId,
         ) -> Result<bool> {
-     #[cfg(test)]
+            #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 Ok(false)
             }
             #[cfg(not(test))]
@@ -1008,7 +1008,7 @@ mod sub_bundle_marketplace {
                     .returns::<bool>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                 result
+                result
             }
         }
 
@@ -1017,9 +1017,9 @@ mod sub_bundle_marketplace {
             token: AccountId,
             token_id: TokenId,
         ) -> Result<Option<AccountId>> {
-     #[cfg(test)]
+            #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 Ok(Some(AccountId::default()))
             }
             #[cfg(not(test))]
@@ -1038,14 +1038,14 @@ mod sub_bundle_marketplace {
                     .returns::<Option<AccountId>>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                 result
+                result
             }
         }
 
         fn get_price(&self, pay_token: AccountId) -> Result<Balance> {
-     #[cfg(test)]
+            #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 Ok(Balance::default())
             }
             #[cfg(not(test))]
@@ -1056,7 +1056,7 @@ mod sub_bundle_marketplace {
                 );
                 let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
                     ink_env::call::FromAccountId::from_account_id(self.address_registry);
-                    self.marketplace_get_price(address_registry_instance.marketplace(), pay_token)
+                self.marketplace_get_price(address_registry_instance.marketplace(), pay_token)
             }
         }
         #[cfg_attr(test, allow(unused_variables))]
@@ -1088,7 +1088,7 @@ mod sub_bundle_marketplace {
         fn erc1155_balance_of(&self, token: AccountId, owner: AccountId) -> Result<Balance> {
             #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 Ok(Balance::default())
             }
             #[cfg(not(test))]
@@ -1107,7 +1107,7 @@ mod sub_bundle_marketplace {
                     .returns::<Balance>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                 result
+                result
             }
         }
         #[cfg_attr(test, allow(unused_variables))]
@@ -1137,7 +1137,7 @@ mod sub_bundle_marketplace {
         fn supports_interface_check(&self, callee: AccountId, data: [u8; 4]) -> bool {
             #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 false
             }
             #[cfg(not(test))]
@@ -1320,13 +1320,13 @@ mod sub_bundle_marketplace {
     mod tests {
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
+        use ink_env::Clear;
         use ink_lang as ink;
-   use ink_env::Clear;
         type Event = <SubBundleMarketplace as ::ink_lang::reflect::ContractEventBase>::Type;
         fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
         }
-  fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
+        fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
             ink_env::test::default_accounts::<Environment>()
         }
 
@@ -1343,8 +1343,7 @@ mod sub_bundle_marketplace {
         }
 
         fn init_contract() -> SubBundleMarketplace {
-            let mut erc = SubBundleMarketplace::new(alice(),0);
-           
+            let mut erc = SubBundleMarketplace::new(alice(), 0);
 
             erc
         }
@@ -1731,7 +1730,7 @@ mod sub_bundle_marketplace {
         }
         fn assert_platform_fee_event(
             event: &ink_env::test::EmittedEvent,
-              expected_platform_fee: Balance,
+            expected_platform_fee: Balance,
         ) {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
                 .expect("encountered invalid contract event data buffer");
@@ -1747,7 +1746,7 @@ mod sub_bundle_marketplace {
 
         fn assert_platform_fee_recipient_event(
             event: &ink_env::test::EmittedEvent,
-             expected_fee_recipient: AccountId,
+            expected_fee_recipient: AccountId,
         ) {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
                 .expect("encountered invalid contract event data buffer");

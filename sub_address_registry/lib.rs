@@ -24,9 +24,7 @@ pub mod sub_address_registry {
     // use ink_lang as ink;
     // use ink_prelude::string::String;
     // use ink_prelude::vec::Vec;
-    use ink_storage::{
-        traits::{SpreadAllocate},
-    };
+    use ink_storage::traits::SpreadAllocate;
     use scale::{Decode, Encode};
 
     #[ink(storage)]
@@ -102,7 +100,7 @@ pub mod sub_address_registry {
         fn supports_interface_check(&self, callee: AccountId, data: [u8; 4]) -> bool {
             #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 false
             }
             #[cfg(not(test))]
@@ -316,7 +314,7 @@ pub mod sub_address_registry {
         fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
         }
-         fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
+        fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
             ink_env::test::default_accounts::<Environment>()
         }
 
@@ -334,7 +332,6 @@ pub mod sub_address_registry {
 
         fn init_contract() -> SubAddressRegistry {
             let mut erc = SubAddressRegistry::new();
-      
 
             erc
         }

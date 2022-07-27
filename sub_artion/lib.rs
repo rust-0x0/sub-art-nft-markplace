@@ -179,7 +179,7 @@ mod sub_artion {
     impl SubArtion {
         /// Creates a new ERC-721 token contract.
         #[ink(constructor)]
-        pub fn new( platform_fee: Balance,fee_recipient: AccountId) -> Self {
+        pub fn new(platform_fee: Balance, fee_recipient: AccountId) -> Self {
             // This call is required in order to correctly initialize the
             // `Mapping`s of our contract.
             ink_lang::utils::initialize_contract(|contract: &mut Self| {
@@ -566,10 +566,10 @@ mod sub_artion {
         use super::*;
         use ink_lang as ink;
 
-  use ink_env::Clear;
+        use ink_env::Clear;
         type Event = <SubArtion as ::ink_lang::reflect::ContractEventBase>::Type;
-      
- fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
+
+        fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
             ink_env::test::default_accounts::<Environment>()
         }
 
@@ -586,8 +586,7 @@ mod sub_artion {
         }
 
         fn init_contract() -> SubArtion {
-            let mut erc = SubArtion::new(0,bob());
-      
+            let mut erc = SubArtion::new(0, bob());
 
             erc
         }
@@ -627,7 +626,7 @@ mod sub_artion {
         }
         fn assert_platform_fee_event(
             event: &ink_env::test::EmittedEvent,
-              expected_platform_fee: Balance,
+            expected_platform_fee: Balance,
         ) {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
                 .expect("encountered invalid contract event data buffer");
@@ -643,7 +642,7 @@ mod sub_artion {
 
         fn assert_platform_fee_recipient_event(
             event: &ink_env::test::EmittedEvent,
-             expected_fee_recipient: AccountId,
+            expected_fee_recipient: AccountId,
         ) {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
                 .expect("encountered invalid contract event data buffer");
@@ -876,7 +875,6 @@ mod sub_artion {
             assert_eq!(erc721.burn(1), Err(Error::NotOwner));
         }
 
-    
         /// For calculating the event topic hash.
         struct PrefixedValue<'a, 'b, T> {
             pub prefix: &'a [u8],

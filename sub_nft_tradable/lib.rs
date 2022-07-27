@@ -660,11 +660,11 @@ pub mod sub_nft_tradable {
     mod tests {
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
+        use ink_env::Clear;
         use ink_lang as ink;
-         use ink_env::Clear;
         type Event = <SubNFTTradable as ::ink_lang::reflect::ContractEventBase>::Type;
-      
- fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
+
+        fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
             ink_env::test::default_accounts::<Environment>()
         }
 
@@ -681,8 +681,15 @@ pub mod sub_nft_tradable {
         }
 
         fn init_contract() -> SubNFTTradable {
-            let mut erc = SubNFTTradable::new(String::from("test"),String::from("TEST"),alice(),alice(),bob(),0,charlie());
-      
+            let mut erc = SubNFTTradable::new(
+                String::from("test"),
+                String::from("TEST"),
+                alice(),
+                alice(),
+                bob(),
+                0,
+                charlie(),
+            );
 
             erc
         }
@@ -760,7 +767,7 @@ pub mod sub_nft_tradable {
         // }
         fn assert_platform_fee_event(
             event: &ink_env::test::EmittedEvent,
-              expected_platform_fee: Balance,
+            expected_platform_fee: Balance,
         ) {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
                 .expect("encountered invalid contract event data buffer");
@@ -776,7 +783,7 @@ pub mod sub_nft_tradable {
 
         fn assert_platform_fee_recipient_event(
             event: &ink_env::test::EmittedEvent,
-             expected_fee_recipient: AccountId,
+            expected_fee_recipient: AccountId,
         ) {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
                 .expect("encountered invalid contract event data buffer");
@@ -792,7 +799,7 @@ pub mod sub_nft_tradable {
             }
         }
         //==================================ERC721=============
-  fn set_caller(sender: AccountId) {
+        fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
         }
         #[ink::test]

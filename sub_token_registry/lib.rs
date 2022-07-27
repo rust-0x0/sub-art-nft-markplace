@@ -18,10 +18,7 @@ macro_rules! ensure {
 mod sub_token_registry {
     // use ink_lang as ink;
     // use ink_prelude::string::String;
-    use ink_storage::{
-        traits::{SpreadAllocate},
-        Mapping,
-    };
+    use ink_storage::{traits::SpreadAllocate, Mapping};
     use scale::{Decode, Encode};
 
     #[ink(storage)]
@@ -110,8 +107,8 @@ mod sub_token_registry {
     mod tests {
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
+        use ink_env::Clear;
         use ink_lang as ink;
-   use ink_env::Clear;
         type Event = <SubTokenRegistry as ::ink_lang::reflect::ContractEventBase>::Type;
         fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
@@ -134,7 +131,6 @@ mod sub_token_registry {
 
         fn init_contract() -> SubTokenRegistry {
             let mut erc = SubTokenRegistry::new();
-      
 
             erc
         }

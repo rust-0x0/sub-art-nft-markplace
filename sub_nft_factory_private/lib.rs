@@ -22,10 +22,7 @@ pub mod sub_nft_factory_private {
     use ink_lang::codegen::EmitEvent;
     use ink_prelude::string::String;
     // use ink_prelude::vec::Vec;
-    use ink_storage::{
-        traits::{ SpreadAllocate},
-        Mapping,
-    };
+    use ink_storage::{traits::SpreadAllocate, Mapping};
     use scale::{Decode, Encode};
     use sub_nft_tradable_private::sub_nft_tradable_private::{ContractCreated, ContractDisabled};
 
@@ -59,7 +56,7 @@ pub mod sub_nft_factory_private {
         NFTContractAlreadyRegistered,
         NotAnERC721Contract,
         NFTContractIsNotRegistered,
-TransactionFailed,
+        TransactionFailed,
     }
 
     // The SubNFTFactory result types.
@@ -173,42 +170,44 @@ TransactionFailed,
                     .is_ok(),
                 Error::TransferFailed
             );
-            let instantiate_contract = ||->Result<AccountId>{ 
-   #[cfg(test)]
-            {
-                ink_env::debug_println!("ans:{:?}",  1);
-                Ok(AccountId::default())
-            }
-#[cfg(not(test))]
-            {
-                use sub_nft_tradable_private::SubNFTTradablePrivateRef;
-                let total_balance = Self::env().balance();
-                let version: u32 = 1;
-                let salt = version.to_le_bytes();
-                let instance_params = SubNFTTradablePrivateRef::new(
-                    name,
-                    symbol,
-                    self.auction,
-                    self.marketplace,
-                    self.bundle_marketplace,
-                    self.mint_fee,
-                    self.fee_recipient,
-                )
-                .endowment(total_balance / 4)
-                .code_hash(self.code_hash)
-                .salt_bytes(salt)
-                .params();
-                let init_result = ink_env::instantiate_contract(&instance_params);
-                let contract_addr =
-                    init_result.expect("failed at instantiating the `Erc721` contract");
-                let mut sub_nft_tradable_private_instance: SubNFTTradablePrivateRef =
-                    ink_env::call::FromAccountId::from_account_id(contract_addr);
-                let _r = sub_nft_tradable_private_instance.transfer_ownership(self.env().caller());
-                ensure!(_r.is_ok(), Error::TransferOwnershipFailed);
+            let instantiate_contract = || -> Result<AccountId> {
+                #[cfg(test)]
+                {
+                    ink_env::debug_println!("ans:{:?}", 1);
+                    Ok(AccountId::default())
+                }
+                #[cfg(not(test))]
+                {
+                    use sub_nft_tradable_private::SubNFTTradablePrivateRef;
+                    let total_balance = Self::env().balance();
+                    let version: u32 = 1;
+                    let salt = version.to_le_bytes();
+                    let instance_params = SubNFTTradablePrivateRef::new(
+                        name,
+                        symbol,
+                        self.auction,
+                        self.marketplace,
+                        self.bundle_marketplace,
+                        self.mint_fee,
+                        self.fee_recipient,
+                    )
+                    .endowment(total_balance / 4)
+                    .code_hash(self.code_hash)
+                    .salt_bytes(salt)
+                    .params();
+                    let init_result = ink_env::instantiate_contract(&instance_params);
+                    let contract_addr =
+                        init_result.expect("failed at instantiating the `Erc721` contract");
+                    let mut sub_nft_tradable_private_instance: SubNFTTradablePrivateRef =
+                        ink_env::call::FromAccountId::from_account_id(contract_addr);
+                    let _r =
+                        sub_nft_tradable_private_instance.transfer_ownership(self.env().caller());
+                    ensure!(_r.is_ok(), Error::TransferOwnershipFailed);
 
-                 Ok(contract_addr)
-            }};
-            let  ans_contract_addr = instantiate_contract()?;
+                    Ok(contract_addr)
+                }
+            };
+            let ans_contract_addr = instantiate_contract()?;
 
             self.exists.insert(&ans_contract_addr, &true);
             self.env().emit_event(ContractCreated {
@@ -265,7 +264,7 @@ TransactionFailed,
         fn supports_interface_check(&self, callee: AccountId, data: [u8; 4]) -> bool {
             #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 false
             }
             #[cfg(not(test))]
@@ -284,7 +283,7 @@ TransactionFailed,
                     .returns::<bool>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                 result.unwrap_or(false)
+                result.unwrap_or(false)
             }
         }
     }
@@ -295,9 +294,9 @@ TransactionFailed,
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
         // use ink_lang as ink;
-use ink_env::Clear;
+        use ink_env::Clear;
         type Event = <sub_nft_tradable_private::SubNFTTradablePrivate as ::ink_lang::reflect::ContractEventBase>::Type;
-  
+
         fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
         }
@@ -318,8 +317,15 @@ use ink_env::Clear;
         }
 
         fn init_contract() -> SubNFTFactoryPrivate {
-            let mut erc = SubNFTFactoryPrivate::new(alice(),alice(),bob(),0,charlie(),0,Hash::from([0x99;32]));
-     
+            let mut erc = SubNFTFactoryPrivate::new(
+                alice(),
+                alice(),
+                bob(),
+                0,
+                charlie(),
+                0,
+                Hash::from([0x99; 32]),
+            );
 
             erc
         }

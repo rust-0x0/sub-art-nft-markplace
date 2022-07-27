@@ -18,10 +18,7 @@ macro_rules! ensure {
 mod sub_price_seed {
     // use ink_lang as ink;
     // use ink_prelude::string::String;
-    use ink_storage::{
-        traits::{SpreadAllocate},
-        Mapping,
-    };
+    use ink_storage::{traits::SpreadAllocate, Mapping};
     use scale::{Decode, Encode};
 
     #[ink(storage)]
@@ -101,9 +98,9 @@ mod sub_price_seed {
         }
         #[cfg_attr(test, allow(unused_variables))]
         fn token_registry_enabled(&self, callee: AccountId, token: AccountId) -> Result<bool> {
-                #[cfg(test)]
+            #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 Ok(false)
             }
             #[cfg(not(test))]
@@ -122,7 +119,7 @@ mod sub_price_seed {
                     .returns::<bool>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                 result
+                result
             }
         }
         /**
@@ -203,9 +200,8 @@ mod sub_price_seed {
             default_accounts().charlie
         }
 
-        fn init_contract() -> SubPriceSeed{
+        fn init_contract() -> SubPriceSeed {
             let mut erc = SubPriceSeed::new();
-      
 
             erc
         }

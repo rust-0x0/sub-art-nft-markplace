@@ -682,8 +682,8 @@ mod sub_marketplace {
         fn is_nft(&self, nft_address: AccountId) -> bool {
             #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
-               false
+                ink_env::debug_println!("ans:{:?}", 1);
+                false
             }
             #[cfg(not(test))]
             {
@@ -714,7 +714,7 @@ mod sub_marketplace {
         fn factory_exists(&self, callee: AccountId, token: AccountId) -> Result<bool> {
             #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 Ok(false)
             }
             #[cfg(not(test))]
@@ -733,15 +733,15 @@ mod sub_marketplace {
                     .returns::<bool>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                 result
+                result
             }
         }
 
         #[ink(message)]
         pub fn get_price(&self, pay_token: AccountId) -> Result<Balance> {
-                        #[cfg(test)]
+            #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 Ok(Balance::default())
             }
             #[cfg(not(test))]
@@ -767,7 +767,7 @@ mod sub_marketplace {
                 } else {
                     unit_price /= 10u128.pow(decimals - 18);
                 }
-                Ok(unit_price) 
+                Ok(unit_price)
             }
         }
         #[cfg_attr(test, allow(unused_variables))]
@@ -814,7 +814,7 @@ mod sub_marketplace {
         fn address_registry_token_registry(&self) -> Result<AccountId> {
             #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 Ok(AccountId::default())
             }
             #[cfg(not(test))]
@@ -830,9 +830,9 @@ mod sub_marketplace {
         }
         #[cfg_attr(test, allow(unused_variables))]
         fn token_registry_enabled(&self, callee: AccountId, token: AccountId) -> Result<bool> {
-                        #[cfg(test)]
+            #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 Ok(false)
             }
             #[cfg(not(test))]
@@ -851,14 +851,14 @@ mod sub_marketplace {
                     .returns::<bool>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                 result
+                result
             }
         }
         #[cfg_attr(test, allow(unused_variables))]
         fn supports_interface_check(&self, callee: AccountId, data: [u8; 4]) -> bool {
-                   #[cfg(test)]
+            #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 false
             }
             #[cfg(not(test))]
@@ -877,7 +877,7 @@ mod sub_marketplace {
                     .returns::<bool>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                 result.unwrap_or(false)
+                result.unwrap_or(false)
             }
         }
 
@@ -1136,9 +1136,9 @@ mod sub_marketplace {
             owner: AccountId,
             operator: AccountId,
         ) -> Result<bool> {
-                        #[cfg(test)]
+            #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 Ok(false)
             }
             #[cfg(not(test))]
@@ -1161,7 +1161,7 @@ mod sub_marketplace {
                     .returns::<bool>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                 result
+                result
             }
         }
 
@@ -1170,9 +1170,9 @@ mod sub_marketplace {
             token: AccountId,
             token_id: TokenId,
         ) -> Result<Option<AccountId>> {
-                        #[cfg(test)]
+            #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 Ok(Some(AccountId::default()))
             }
             #[cfg(not(test))]
@@ -1191,7 +1191,7 @@ mod sub_marketplace {
                     .returns::<Option<AccountId>>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                 result
+                result
             }
         }
 
@@ -1203,7 +1203,7 @@ mod sub_marketplace {
         ) -> Result<bool> {
             #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 Ok(false)
             }
             #[cfg(not(test))]
@@ -1226,14 +1226,14 @@ mod sub_marketplace {
                     .returns::<bool>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                 result
+                result
             }
         }
 
         fn erc1155_balance_of(&self, token: AccountId, owner: AccountId) -> Result<Balance> {
             #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
+                ink_env::debug_println!("ans:{:?}", 1);
                 Ok(Balance::default())
             }
             #[cfg(not(test))]
@@ -1252,7 +1252,7 @@ mod sub_marketplace {
                     .returns::<Balance>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                 result
+                result
             }
         }
 
@@ -1261,10 +1261,10 @@ mod sub_marketplace {
             nft_address: AccountId,
             token_id: TokenId,
         ) -> Result<(u128, bool)> {
-                        #[cfg(test)]
+            #[cfg(test)]
             {
-                ink_env::debug_println!("ans:{:?}",  1);
-                Ok((0,false))
+                ink_env::debug_println!("ans:{:?}", 1);
+                Ok((0, false))
             }
             #[cfg(not(test))]
             {
@@ -1288,7 +1288,7 @@ mod sub_marketplace {
                     .returns::<(u128, bool)>()
                     .fire()
                     .map_err(|_| Error::TransactionFailed);
-                 result
+                result
             }
         }
 
@@ -1355,7 +1355,7 @@ mod sub_marketplace {
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
         // use ink_lang as ink;
-       use ink_env::Clear;
+        use ink_env::Clear;
         type Event = <SubMarketplace as ::ink_lang::reflect::ContractEventBase>::Type;
 
         fn set_caller(sender: AccountId) {
@@ -1378,8 +1378,7 @@ mod sub_marketplace {
         }
 
         fn init_contract() -> SubMarketplace {
-            let mut erc = SubMarketplace::new(alice(),0);
-           
+            let mut erc = SubMarketplace::new(alice(), 0);
 
             erc
         }
@@ -1839,7 +1838,7 @@ mod sub_marketplace {
         }
         fn assert_platform_fee_event(
             event: &ink_env::test::EmittedEvent,
-              expected_platform_fee: Balance,
+            expected_platform_fee: Balance,
         ) {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
                 .expect("encountered invalid contract event data buffer");
@@ -1855,7 +1854,7 @@ mod sub_marketplace {
 
         fn assert_platform_fee_recipient_event(
             event: &ink_env::test::EmittedEvent,
-             expected_fee_recipient: AccountId,
+            expected_fee_recipient: AccountId,
         ) {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
                 .expect("encountered invalid contract event data buffer");

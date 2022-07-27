@@ -988,7 +988,7 @@ pub mod sub_art_tradable {
 
         use ink_lang as ink;
 
-        fn set_sender(sender: AccountId) {
+        fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<Environment>(sender);
         }
 
@@ -1009,8 +1009,15 @@ pub mod sub_art_tradable {
         }
 
         fn init_contract() -> SubArtTradable {
-            let mut erc = SubArtTradable::new(String::from("test"),String::from("TEST"),alice(),bob(),0,charlie());
-                    erc.balances.insert((alice(), 1), &10);
+            let mut erc = SubArtTradable::new(
+                String::from("test"),
+                String::from("TEST"),
+                alice(),
+                bob(),
+                0,
+                charlie(),
+            );
+            erc.balances.insert((alice(), 1), &10);
             erc.balances.insert((alice(), 2), &20);
             erc.balances.insert((bob(), 1), &10);
 
@@ -1107,10 +1114,10 @@ pub mod sub_art_tradable {
             let owner = alice();
             let operator = bob();
 
-            set_sender(owner);
+            set_caller(owner);
             assert!(erc.set_approval_for_all(operator, true).is_ok());
 
-            set_sender(operator);
+            set_caller(operator);
             assert!(erc
                 .safe_transfer_from(owner, charlie(), 1, 5, vec![])
                 .is_ok());
@@ -1127,7 +1134,7 @@ pub mod sub_art_tradable {
 
             // Note: All of these tests are from the context of the owner who is either allowing or
             // disallowing an operator to control their funds.
-            set_sender(owner);
+            set_caller(owner);
             assert!(!erc.is_approved_for_all(owner, operator));
 
             assert!(erc.set_approval_for_all(operator, true).is_ok());
@@ -1144,7 +1151,7 @@ pub mod sub_art_tradable {
         fn minting_tokens_works() {
             let mut erc = init_contract();
 
-            set_sender(alice());
+            set_caller(alice());
             assert_eq!(erc.create(0), 1);
             assert_eq!(erc.balance_of(alice(), 1), 0);
 
@@ -1313,7 +1320,7 @@ pub mod sub_art_tradable {
         fn minting_to_tokens_works() {
             let mut erc = init_contract();
 
-            set_sender(alice());
+            set_caller(alice());
 
             assert!(erc.mint_to(bob(), 1, 123).is_ok());
             assert_eq!(erc.balance_of(bob(), 1), 123);
@@ -1351,9 +1358,9 @@ pub mod sub_art_tradable {
         fn burning_to_tokens_works() {
             let mut erc = init_contract();
 
-            set_sender(alice());
+            set_caller(alice());
             erc.balances.insert((bob(), 1), &123);
-        erc.approvals.insert((&bob(), &alice()), &());
+            erc.approvals.insert((&bob(), &alice()), &());
             assert!(erc.burn(bob(), 1, 123).is_ok());
             assert_eq!(erc.balance_of(bob(), 1), 0);
             let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
@@ -1372,8 +1379,8 @@ pub mod sub_art_tradable {
             let mut erc = init_contract();
             erc.balances.insert((bob(), 1), &5);
             erc.balances.insert((bob(), 2), &10);
-set_sender(alice());
-        erc.approvals.insert((&bob(), &alice()), &());
+            set_caller(alice());
+            erc.approvals.insert((&bob(), &alice()), &());
             assert!(erc.burn_batch(bob(), vec![1, 2], vec![5, 10]).is_ok());
             let balances = erc.balance_of_batch(vec![bob()], vec![1, 2]);
             assert_eq!(balances, vec![0, 0]);
