@@ -384,7 +384,8 @@ pub mod sub_nft_tradable_private {
             );
             Ok(())
         }
-        ///ERC721 ==============
+
+        /// ===========ERC721====================================
         #[ink(message)]
         pub fn transfer_ownership(&mut self, new_owner: AccountId) -> Result<()> {
             ensure!(self.env().caller() == self.owner, Error::OnlyOwner);
@@ -661,15 +662,145 @@ pub mod sub_nft_tradable_private {
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
         use ink_lang as ink;
+         use ink_env::Clear;
+        type Event = <SubNFTTradablePrivate as ::ink_lang::reflect::ContractEventBase>::Type;
+      
+ fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
+            ink_env::test::default_accounts::<Environment>()
+        }
 
-        fn set_caller(sender: AccountId) {
+        fn alice() -> AccountId {
+            default_accounts().alice
+        }
+
+        fn bob() -> AccountId {
+            default_accounts().bob
+        }
+
+        fn charlie() -> AccountId {
+            default_accounts().charlie
+        }
+
+        fn init_contract() -> SubNFTTradablePrivate {
+            let mut erc = SubNFTTradablePrivate::new(String::from("test"),String::from("TEST"),alice(),alice(),bob(),0,charlie());
+      
+
+            erc
+        }
+        // fn assert_transfer_batch_event(
+        //     event: &ink_env::test::EmittedEvent,
+        //     expected_operator: Option<AccountId>,
+        //     expected_from: Option<AccountId>,
+        //     expected_to: Option<AccountId>,
+        //     expected_token_ids: Vec<TokenId>,
+        //     expected_values: Vec<Balance>,
+        // ) {
+        //     let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+        //         .expect("encountered invalid contract event data buffer");
+        //     if let Event::TransferBatch(TransferBatch {
+        //         operator,
+        //         from,
+        //         to,
+        //         token_ids,
+        //         values,
+        //     }) = decoded_event
+        //     {
+        //         assert_eq!(
+        //             operator, expected_operator,
+        //             "encountered invalid TransferBatch.operator"
+        //         );
+        //         assert_eq!(
+        //             from, expected_from,
+        //             "encountered invalid TransferBatch.from"
+        //         );
+        //         assert_eq!(to, expected_to, "encountered invalid TransferBatch.to");
+        //         assert_eq!(
+        //             token_ids, expected_token_ids,
+        //             "encountered invalid TransferBatch.token_ids"
+        //         );
+        //         assert_eq!(
+        //             values, expected_values,
+        //             "encountered invalid TransferBatch.values"
+        //         );
+        //     } else {
+        //         panic!("encountered unexpected event kind: expected a TransferBatch event")
+        //     }
+        //     let expected_topics = vec![
+        //         encoded_into_hash(&PrefixedValue {
+        //             value: b"Contract::TransferBatch",
+        //             prefix: b"",
+        //         }),
+        //         encoded_into_hash(&PrefixedValue {
+        //             prefix: b"Contract::TransferBatch::operator",
+        //             value: &expected_operator,
+        //         }),
+        //         encoded_into_hash(&PrefixedValue {
+        //             prefix: b"Contract::TransferBatch::from",
+        //             value: &expected_from,
+        //         }),
+        //         encoded_into_hash(&PrefixedValue {
+        //             prefix: b"Contract::TransferBatch::to",
+        //             value: &expected_to,
+        //         }),
+        //     ];
+
+        //     let topics = event.topics.clone();
+        //     for (n, (actual_topic, expected_topic)) in
+        //         topics.iter().zip(expected_topics).enumerate()
+        //     {
+        //         let mut topic_hash = Hash::clear();
+        //         let len = actual_topic.len();
+        //         topic_hash.as_mut()[0..len].copy_from_slice(&actual_topic[0..len]);
+
+        //         assert_eq!(
+        //             topic_hash, expected_topic,
+        //             "encountered invalid topic at {}",
+        //             n
+        //         );
+        //     }
+        // }
+        fn assert_platform_fee_event(
+            event: &ink_env::test::EmittedEvent,
+              expected_platform_fee: Balance,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::UpdatePlatformFee(UpdatePlatformFee { platform_fee }) = decoded_event {
+                assert_eq!(
+                    platform_fee, expected_platform_fee,
+                    "encountered invalid UpdatePlatformFee.platform_fee"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a UpdatePlatformFee event")
+            }
+        }
+
+        fn assert_platform_fee_recipient_event(
+            event: &ink_env::test::EmittedEvent,
+             expected_fee_recipient: AccountId,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::UpdatePlatformFeeRecipient(UpdatePlatformFeeRecipient { fee_recipient }) =
+                decoded_event
+            {
+                assert_eq!(
+                    fee_recipient, expected_fee_recipient,
+                    "encountered invalid UpdatePlatformFeeRecipient.fee_recipient"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a UpdatePlatformFeeRecipient event")
+            }
+        }
+        //==================================ERC721=============
+    fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
         }
         #[ink::test]
         fn mint_works() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Token 1 does not exists.
             assert_eq!(erc721.owner_of(1), None);
             // Alice does not owns tokens.
@@ -684,7 +815,7 @@ pub mod sub_nft_tradable_private {
         fn mint_existing_should_fail() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Create token Id 1.
             assert_eq!(erc721.mint(1), Ok(()));
             // The first Transfer event takes place
@@ -702,7 +833,7 @@ pub mod sub_nft_tradable_private {
         fn transfer_works() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Create token Id 1 for Alice
             assert_eq!(erc721.mint(1), Ok(()));
             // Alice owns token 1
@@ -723,7 +854,7 @@ pub mod sub_nft_tradable_private {
         fn invalid_transfer_should_fail() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Transfer token fails if it does not exists.
             assert_eq!(erc721.transfer(accounts.bob, 2), Err(Error::TokenNotFound));
             // Token Id 2 does not exists.
@@ -744,7 +875,7 @@ pub mod sub_nft_tradable_private {
         fn approved_transfer_works() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Create token Id 1.
             assert_eq!(erc721.mint(1), Ok(()));
             // Token Id 1 is owned by Alice.
@@ -772,7 +903,7 @@ pub mod sub_nft_tradable_private {
         fn approved_for_all_works() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Create token Id 1.
             assert_eq!(erc721.mint(1), Ok(()));
             // Create token Id 2.
@@ -814,7 +945,7 @@ pub mod sub_nft_tradable_private {
         fn not_approved_transfer_should_fail() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Create token Id 1.
             assert_eq!(erc721.mint(1), Ok(()));
             // Alice owns 1 token.
@@ -842,7 +973,7 @@ pub mod sub_nft_tradable_private {
         fn burn_works() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Create token Id 1 for Alice
             assert_eq!(erc721.mint(1), Ok(()));
             // Alice owns 1 token.
@@ -860,7 +991,7 @@ pub mod sub_nft_tradable_private {
         #[ink::test]
         fn burn_fails_token_not_found() {
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Try burning a non existent token
             assert_eq!(erc721.burn(1), Err(Error::TokenNotFound));
         }
@@ -869,7 +1000,7 @@ pub mod sub_nft_tradable_private {
         fn burn_fails_not_owner() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Create token Id 1 for Alice
             assert_eq!(erc721.mint(1), Ok(()));
             // Try burning this token with a different account
@@ -877,136 +1008,7 @@ pub mod sub_nft_tradable_private {
             assert_eq!(erc721.burn(1), Err(Error::NotOwner));
         }
 
-        fn set_caller(sender: AccountId) {
-            ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
-        }
-        fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
-            ink_env::test::default_accounts::<Environment>()
-        }
-
-        fn alice() -> AccountId {
-            default_accounts().alice
-        }
-
-        fn bob() -> AccountId {
-            default_accounts().bob
-        }
-
-        fn charlie() -> AccountId {
-            default_accounts().charlie
-        }
-
-        fn init_contract() -> SubNFTTradablePrivate {
-            let mut erc = SubNFTTradablePrivate::new();
-          
-
-            erc
-        }
-        fn assert_transfer_batch_event(
-            event: &ink_env::test::EmittedEvent,
-            expected_operator: Option<AccountId>,
-            expected_from: Option<AccountId>,
-            expected_to: Option<AccountId>,
-            expected_token_ids: Vec<TokenId>,
-            expected_values: Vec<Balance>,
-        ) {
-            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
-                .expect("encountered invalid contract event data buffer");
-            if let Event::TransferBatch(TransferBatch {
-                operator,
-                from,
-                to,
-                token_ids,
-                values,
-            }) = decoded_event
-            {
-                assert_eq!(
-                    operator, expected_operator,
-                    "encountered invalid TransferBatch.operator"
-                );
-                assert_eq!(
-                    from, expected_from,
-                    "encountered invalid TransferBatch.from"
-                );
-                assert_eq!(to, expected_to, "encountered invalid TransferBatch.to");
-                assert_eq!(
-                    token_ids, expected_token_ids,
-                    "encountered invalid TransferBatch.token_ids"
-                );
-                assert_eq!(
-                    values, expected_values,
-                    "encountered invalid TransferBatch.values"
-                );
-            } else {
-                panic!("encountered unexpected event kind: expected a TransferBatch event")
-            }
-            let expected_topics = vec![
-                encoded_into_hash(&PrefixedValue {
-                    value: b"Contract::TransferBatch",
-                    prefix: b"",
-                }),
-                encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::TransferBatch::operator",
-                    value: &expected_operator,
-                }),
-                encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::TransferBatch::from",
-                    value: &expected_from,
-                }),
-                encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::TransferBatch::to",
-                    value: &expected_to,
-                }),
-            ];
-
-            let topics = event.topics.clone();
-            for (n, (actual_topic, expected_topic)) in
-                topics.iter().zip(expected_topics).enumerate()
-            {
-                let mut topic_hash = Hash::clear();
-                let len = actual_topic.len();
-                topic_hash.as_mut()[0..len].copy_from_slice(&actual_topic[0..len]);
-
-                assert_eq!(
-                    topic_hash, expected_topic,
-                    "encountered invalid topic at {}",
-                    n
-                );
-            }
-        }
-        fn assert_platform_fee_event(
-            event: &ink_env::test::EmittedEvent,
-            expected_platform_fee: bool,
-        ) {
-            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
-                .expect("encountered invalid contract event data buffer");
-            if let Event::UpdatePlatformFee(UpdatePlatformFee { platform_fee }) = decoded_event {
-                assert_eq!(
-                    platform_fee, expected_platform_fee,
-                    "encountered invalid UpdatePlatformFee.platform_fee"
-                );
-            } else {
-                panic!("encountered unexpected event kind: expected a UpdatePlatformFee event")
-            }
-        }
-
-        fn assert_platform_fee_recipient_event(
-            event: &ink_env::test::EmittedEvent,
-            expected_fee_recipient: bool,
-        ) {
-            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
-                .expect("encountered invalid contract event data buffer");
-            if let Event::UpdatePlatformFeeRecipient(UpdatePlatformFeeRecipient { fee_recipient }) =
-                decoded_event
-            {
-                assert_eq!(
-                    fee_recipient, expected_fee_recipient,
-                    "encountered invalid UpdatePlatformFeeRecipient.fee_recipient"
-                );
-            } else {
-                panic!("encountered unexpected event kind: expected a UpdatePlatformFeeRecipient event")
-            }
-        }
+       
         /// For calculating the event topic hash.
         struct PrefixedValue<'a, 'b, T> {
             pub prefix: &'a [u8],

@@ -159,6 +159,11 @@ TransactionFailed,
                 Error::TransferFailed
             );
         let  instantiate_contract=||->Result<AccountId>{
+   #[cfg(test)]
+            {
+                ink_env::debug_println!("ans:{:?}",  1);
+                Ok(AccountId::default())
+            }
         #[cfg(not(test))]
             {
                 use sub_art_tradable_private::SubArtTradablePrivateRef;
@@ -242,6 +247,11 @@ TransactionFailed,
         }
         #[cfg_attr(test, allow(unused_variables))]
         fn supports_interface_check(&self, callee: AccountId, data: [u8; 4]) -> bool {
+            #[cfg(test)]
+            {
+                ink_env::debug_println!("ans:{:?}",  1);
+                false
+            }
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
@@ -269,7 +279,8 @@ TransactionFailed,
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
         use ink_lang as ink;
-
+   use ink_env::Clear;
+        type Event = <sub_art_tradable_private::SubArtTradablePrivate as ::ink_lang::reflect::ContractEventBase>::Type;
         fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
         }
@@ -281,7 +292,11 @@ TransactionFailed,
         ) {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
                 .expect("encountered invalid contract event data buffer");
-            if let Event::ContractCreated(ContractCreated { token }) = decoded_event {
+            if let Event::ContractCreated(ContractCreated {
+                creator,
+                nft_address,
+            }) = decoded_event
+            {
                 assert_eq!(
                     creator, expected_creator,
                     "encountered invalid ContractCreated.creator"
@@ -302,7 +317,11 @@ TransactionFailed,
         ) {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
                 .expect("encountered invalid contract event data buffer");
-            if let Event::ContractDisabled(ContractDisabled { token }) = decoded_event {
+            if let Event::ContractDisabled(ContractDisabled {
+                caller,
+                nft_address,
+            }) = decoded_event
+            {
                 assert_eq!(
                     caller, expected_caller,
                     "encountered invalid ContractDisabled.caller"

@@ -1013,8 +1013,10 @@ pub mod sub_art_tradable_private {
         }
 
         fn init_contract() -> SubArtTradablePrivate {
-            let mut erc = SubArtTradablePrivate::new();
-         
+            let mut erc = SubArtTradablePrivate::new(String::from("test"),String::from("TEST"),alice(),bob(),0,charlie());
+                  erc.balances.insert((alice(), 1), &10);
+            erc.balances.insert((alice(), 2), &20);
+            erc.balances.insert((bob(), 1), &10);
 
             erc
         }
@@ -1144,7 +1146,7 @@ pub mod sub_art_tradable_private {
 
         #[ink::test]
         fn minting_tokens_works() {
-            let mut erc = SubArtTradablePrivate::new();
+            let mut erc = init_contract();
 
             set_sender(alice());
             assert_eq!(erc.create(0), 1);
@@ -1156,7 +1158,7 @@ pub mod sub_art_tradable_private {
 
         #[ink::test]
         fn minting_not_allowed_for_nonexistent_tokens() {
-            let mut erc = SubArtTradablePrivate::new();
+            let mut erc = init_contract();
 
             let res = erc.mint(1, 123);
             assert_eq!(res.unwrap_err(), Error::UnexistentToken);
@@ -1313,7 +1315,7 @@ pub mod sub_art_tradable_private {
 
         #[ink::test]
         fn minting_to_tokens_works() {
-            let mut erc = SubArtTradablePrivate::new();
+            let mut erc = init_contract();
 
             set_sender(alice());
 
@@ -1351,10 +1353,11 @@ pub mod sub_art_tradable_private {
 
         #[ink::test]
         fn burning_to_tokens_works() {
-            let mut erc = SubArtTradablePrivate::new();
+            let mut erc = init_contract();
 
             set_sender(alice());
             erc.balances.insert((bob(), 1), &123);
+        erc.approvals.insert((&bob(), &alice()), &());
             assert!(erc.burn(bob(), 1, 123).is_ok());
             assert_eq!(erc.balance_of(bob(), 1), 0);
             let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
@@ -1373,6 +1376,8 @@ pub mod sub_art_tradable_private {
             let mut erc = init_contract();
             erc.balances.insert((bob(), 1), &5);
             erc.balances.insert((bob(), 2), &10);
+set_sender(alice());
+        erc.approvals.insert((&bob(), &alice()), &());
             assert!(erc.burn_batch(bob(), vec![1, 2], vec![5, 10]).is_ok());
             let balances = erc.balance_of_batch(vec![bob()], vec![1, 2]);
             assert_eq!(balances, vec![0, 0]);

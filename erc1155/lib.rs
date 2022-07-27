@@ -1153,6 +1153,7 @@ pub mod erc1155 {
 
             set_sender(alice());
             erc.balances.insert((bob(), 1), &123);
+   erc.approvals.insert((&bob(), &alice()), &());
             assert!(erc.burn(bob(), 1, 123).is_ok());
             assert_eq!(erc.balance_of(bob(), 1), 0);
             let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
@@ -1171,6 +1172,8 @@ pub mod erc1155 {
             let mut erc = init_contract();
             erc.balances.insert((bob(), 1), &5);
             erc.balances.insert((bob(), 2), &10);
+            set_sender(alice());
+   erc.approvals.insert((&bob(), &alice()), &());
             assert!(erc.burn_batch(bob(), vec![1, 2], vec![5, 10]).is_ok());
             let balances = erc.balance_of_batch(vec![bob()], vec![1, 2]);
             assert_eq!(balances, vec![0, 0]);

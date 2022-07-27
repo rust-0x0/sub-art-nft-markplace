@@ -80,6 +80,7 @@ mod sub_price_seed {
             self.oracles.insert(&token, &oracle);
             Ok(())
         }
+        #[cfg_attr(test, allow(unused_variables))]
         fn ensure_token_registry_enabled(&self, token: AccountId) -> Result<()> {
             #[cfg(not(test))]
             {
@@ -100,6 +101,11 @@ mod sub_price_seed {
         }
         #[cfg_attr(test, allow(unused_variables))]
         fn token_registry_enabled(&self, callee: AccountId, token: AccountId) -> Result<bool> {
+                #[cfg(test)]
+            {
+                ink_env::debug_println!("ans:{:?}",  1);
+                Ok(false)
+            }
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
@@ -176,10 +182,32 @@ mod sub_price_seed {
     mod tests {
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
-        use ink_lang as ink;
+        // use ink_lang as ink;
 
         fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
+        }
+        fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
+            ink_env::test::default_accounts::<Environment>()
+        }
+
+        fn alice() -> AccountId {
+            default_accounts().alice
+        }
+
+        fn bob() -> AccountId {
+            default_accounts().bob
+        }
+
+        fn charlie() -> AccountId {
+            default_accounts().charlie
+        }
+
+        fn init_contract() -> SubPriceSeed{
+            let mut erc = SubPriceSeed::new();
+      
+
+            erc
         }
     }
 }

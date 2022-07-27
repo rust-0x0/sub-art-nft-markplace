@@ -111,7 +111,8 @@ mod sub_token_registry {
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
         use ink_lang as ink;
-
+   use ink_env::Clear;
+        type Event = <SubTokenRegistry as ::ink_lang::reflect::ContractEventBase>::Type;
         fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
         }

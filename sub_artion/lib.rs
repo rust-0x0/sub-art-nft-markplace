@@ -179,13 +179,13 @@ mod sub_artion {
     impl SubArtion {
         /// Creates a new ERC-721 token contract.
         #[ink(constructor)]
-        pub fn new(fee_recipient: AccountId, platform_fee: Balance) -> Self {
+        pub fn new( platform_fee: Balance,fee_recipient: AccountId) -> Self {
             // This call is required in order to correctly initialize the
             // `Mapping`s of our contract.
             ink_lang::utils::initialize_contract(|contract: &mut Self| {
                 contract.owner = Self::env().caller();
-                contract.fee_recipient = fee_recipient;
                 contract.platform_fee = platform_fee;
+                contract.fee_recipient = fee_recipient;
             })
         }
 
@@ -566,14 +566,109 @@ mod sub_artion {
         use super::*;
         use ink_lang as ink;
 
+  use ink_env::Clear;
+        type Event = <SubArtion as ::ink_lang::reflect::ContractEventBase>::Type;
+      
+ fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
+            ink_env::test::default_accounts::<Environment>()
+        }
+
+        fn alice() -> AccountId {
+            default_accounts().alice
+        }
+
+        fn bob() -> AccountId {
+            default_accounts().bob
+        }
+
+        fn charlie() -> AccountId {
+            default_accounts().charlie
+        }
+
+        fn init_contract() -> SubArtion {
+            let mut erc = SubArtion::new(0,bob());
+      
+
+            erc
+        }
+
+        fn assert_minted_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_token_id: TokenId,
+            expected_beneficiary: AccountId,
+            expected_token_uri: String,
+            expected_minter: AccountId,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::Minted(Minted {
+                token_id,
+                beneficiary,
+                token_uri,
+                minter,
+            }) = decoded_event
+            {
+                assert_eq!(
+                    token_id, expected_token_id,
+                    "encountered invalid Minted.token_id"
+                );
+                assert_eq!(
+                    beneficiary, expected_beneficiary,
+                    "encountered invalid Minted.beneficiary"
+                );
+                assert_eq!(
+                    token_uri, expected_token_uri,
+                    "encountered invalid Minted.token_uri"
+                );
+                assert_eq!(minter, expected_minter, "encountered invalid Minted.minter");
+            } else {
+                panic!("encountered unexpected event kind: expected a Minted event")
+            }
+        }
+        fn assert_platform_fee_event(
+            event: &ink_env::test::EmittedEvent,
+              expected_platform_fee: Balance,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::UpdatePlatformFee(UpdatePlatformFee { platform_fee }) = decoded_event {
+                assert_eq!(
+                    platform_fee, expected_platform_fee,
+                    "encountered invalid UpdatePlatformFee.platform_fee"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a UpdatePlatformFee event")
+            }
+        }
+
+        fn assert_platform_fee_recipient_event(
+            event: &ink_env::test::EmittedEvent,
+             expected_fee_recipient: AccountId,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::UpdatePlatformFeeRecipient(UpdatePlatformFeeRecipient { fee_recipient }) =
+                decoded_event
+            {
+                assert_eq!(
+                    fee_recipient, expected_fee_recipient,
+                    "encountered invalid UpdatePlatformFeeRecipient.fee_recipient"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a UpdatePlatformFeeRecipient event")
+            }
+        }
+
+        /// ===================ERC721=======================
         fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
         }
+
         #[ink::test]
         fn mint_works() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Token 1 does not exists.
             assert_eq!(erc721.owner_of(1), None);
             // Alice does not owns tokens.
@@ -588,7 +683,7 @@ mod sub_artion {
         fn mint_existing_should_fail() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Create token Id 1.
             assert_eq!(erc721.mint(1), Ok(()));
             // The first Transfer event takes place
@@ -606,7 +701,7 @@ mod sub_artion {
         fn transfer_works() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Create token Id 1 for Alice
             assert_eq!(erc721.mint(1), Ok(()));
             // Alice owns token 1
@@ -627,7 +722,7 @@ mod sub_artion {
         fn invalid_transfer_should_fail() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Transfer token fails if it does not exists.
             assert_eq!(erc721.transfer(accounts.bob, 2), Err(Error::TokenNotFound));
             // Token Id 2 does not exists.
@@ -648,7 +743,7 @@ mod sub_artion {
         fn approved_transfer_works() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Create token Id 1.
             assert_eq!(erc721.mint(1), Ok(()));
             // Token Id 1 is owned by Alice.
@@ -676,7 +771,7 @@ mod sub_artion {
         fn approved_for_all_works() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Create token Id 1.
             assert_eq!(erc721.mint(1), Ok(()));
             // Create token Id 2.
@@ -718,7 +813,7 @@ mod sub_artion {
         fn not_approved_transfer_should_fail() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Create token Id 1.
             assert_eq!(erc721.mint(1), Ok(()));
             // Alice owns 1 token.
@@ -746,7 +841,7 @@ mod sub_artion {
         fn burn_works() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Create token Id 1 for Alice
             assert_eq!(erc721.mint(1), Ok(()));
             // Alice owns 1 token.
@@ -764,7 +859,7 @@ mod sub_artion {
         #[ink::test]
         fn burn_fails_token_not_found() {
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Try burning a non existent token
             assert_eq!(erc721.burn(1), Err(Error::TokenNotFound));
         }
@@ -773,7 +868,7 @@ mod sub_artion {
         fn burn_fails_not_owner() {
             let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
-            let mut erc721 = Erc721::new();
+            let mut erc721 = init_contract();
             // Create token Id 1 for Alice
             assert_eq!(erc721.mint(1), Ok(()));
             // Try burning this token with a different account
@@ -781,75 +876,7 @@ mod sub_artion {
             assert_eq!(erc721.burn(1), Err(Error::NotOwner));
         }
 
-        fn set_caller(sender: AccountId) {
-            ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
-        }
-        fn assert_minted_event(
-            event: &ink_env::test::EmittedEvent,
-            expected_token_id: TokenId,
-            expected_beneficiary: AccountId,
-            token_uri: String,
-            expected_minter: AccountId,
-        ) {
-            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
-                .expect("encountered invalid contract event data buffer");
-            if let Event::Minted(Minted {
-                token_id,
-                beneficiary,
-                token_uri,
-                minter,
-            }) = decoded_event
-            {
-                assert_eq!(
-                    token_id, expected_token_id,
-                    "encountered invalid Minted.token_id"
-                );
-                assert_eq!(
-                    beneficiary, expected_beneficiary,
-                    "encountered invalid Minted.beneficiary"
-                );
-                assert_eq!(
-                    token_uri, expected_token_uri,
-                    "encountered invalid Minted.token_uri"
-                );
-                assert_eq!(minter, expected_minter, "encountered invalid Minted.minter");
-            } else {
-                panic!("encountered unexpected event kind: expected a Minted event")
-            }
-        }
-        fn assert_platform_fee_event(
-            event: &ink_env::test::EmittedEvent,
-            expected_platform_fee: bool,
-        ) {
-            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
-                .expect("encountered invalid contract event data buffer");
-            if let Event::UpdatePlatformFee(UpdatePlatformFee { platform_fee }) = decoded_event {
-                assert_eq!(
-                    platform_fee, expected_platform_fee,
-                    "encountered invalid UpdatePlatformFee.platform_fee"
-                );
-            } else {
-                panic!("encountered unexpected event kind: expected a UpdatePlatformFee event")
-            }
-        }
-
-        fn assert_platform_fee_recipient_event(
-            event: &ink_env::test::EmittedEvent,
-            expected_fee_recipient: bool,
-        ) {
-            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
-                .expect("encountered invalid contract event data buffer");
-            if let Event::UpdatePlatformFeeRecipient(UpdatePlatformFeeRecipient { fee_recipient }) =
-                decoded_event
-            {
-                assert_eq!(
-                    fee_recipient, expected_fee_recipient,
-                    "encountered invalid UpdatePlatformFeeRecipient.fee_recipient"
-                );
-            } else {
-                panic!("encountered unexpected event kind: expected a UpdatePlatformFeeRecipient event")
-            }
-        }
+    
         /// For calculating the event topic hash.
         struct PrefixedValue<'a, 'b, T> {
             pub prefix: &'a [u8],

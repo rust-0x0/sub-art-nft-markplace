@@ -100,6 +100,11 @@ pub mod sub_address_registry {
         }
         #[cfg_attr(test, allow(unused_variables))]
         fn supports_interface_check(&self, callee: AccountId, data: [u8; 4]) -> bool {
+            #[cfg(test)]
+            {
+                ink_env::debug_println!("ans:{:?}",  1);
+                false
+            }
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
@@ -310,6 +315,28 @@ pub mod sub_address_registry {
 
         fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
+        }
+         fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
+            ink_env::test::default_accounts::<Environment>()
+        }
+
+        fn alice() -> AccountId {
+            default_accounts().alice
+        }
+
+        fn bob() -> AccountId {
+            default_accounts().bob
+        }
+
+        fn charlie() -> AccountId {
+            default_accounts().charlie
+        }
+
+        fn init_contract() -> SubAddressRegistry {
+            let mut erc = SubAddressRegistry::new();
+      
+
+            erc
         }
     }
 }

@@ -22,10 +22,7 @@ mod sub_art_factory {
     use ink_lang::codegen::EmitEvent;
     use ink_prelude::string::String;
     // use ink_prelude::vec::Vec;
-    use ink_storage::{
-        traits::{ SpreadAllocate},
-        Mapping,
-    };
+    use ink_storage::{traits::SpreadAllocate, Mapping};
     use scale::{Decode, Encode};
     use sub_art_tradable::sub_art_tradable::{ContractCreated, ContractDisabled};
 
@@ -57,7 +54,7 @@ mod sub_art_factory {
         ArtContractAlreadyRegistered,
         NotAnERC1155Contract,
         ArtContractIsNotRegistered,
-TransactionFailed,
+        TransactionFailed,
     }
 
     // The SubArtFactory result types.
@@ -158,38 +155,43 @@ TransactionFailed,
                     .is_ok(),
                 Error::TransferFailed
             );
-        let  instantiate_contract=||->Result<AccountId>{
-        #[cfg(not(test))]
-            {
-                use sub_art_tradable::SubArtTradableRef;
-                let total_balance = Self::env().balance();
-                let version: u32 = 1;
-                let salt = version.to_le_bytes();
-                let instance_params = SubArtTradableRef::new(
-                    name,
-                    symbol,
-                    self.marketplace,
-                    self.bundle_marketplace,
-                    self.mint_fee,
-                    self.fee_recipient,
-                )
-                .endowment(total_balance / 4)
-                .code_hash(self.code_hash)
-                .salt_bytes(salt)
-                .params();
-                let init_result = ink_env::instantiate_contract(&instance_params);
-                let contract_addr =
-                    init_result.expect("failed at instantiating the `Erc1155` contract");
-                let mut sub_art_tradable_instance: SubArtTradableRef =
-                    ink_env::call::FromAccountId::from_account_id(contract_addr);
-                let _r = sub_art_tradable_instance.transfer_ownership(self.env().caller());
-                ensure!(_r.is_ok(), Error::TransferOwnershipFailed);
+            let instantiate_contract = || -> Result<AccountId> {
+                #[cfg(test)]
+                {
+                    ink_env::debug_println!("ans:{:?}", 1);
+                    Ok(AccountId::default())
+                }
+                #[cfg(not(test))]
+                {
+                    use sub_art_tradable::SubArtTradableRef;
+                    let total_balance = Self::env().balance();
+                    let version: u32 = 1;
+                    let salt = version.to_le_bytes();
+                    let instance_params = SubArtTradableRef::new(
+                        name,
+                        symbol,
+                        self.marketplace,
+                        self.bundle_marketplace,
+                        self.mint_fee,
+                        self.fee_recipient,
+                    )
+                    .endowment(total_balance / 4)
+                    .code_hash(self.code_hash)
+                    .salt_bytes(salt)
+                    .params();
+                    let init_result = ink_env::instantiate_contract(&instance_params);
+                    let contract_addr =
+                        init_result.expect("failed at instantiating the `Erc1155` contract");
+                    let mut sub_art_tradable_instance: SubArtTradableRef =
+                        ink_env::call::FromAccountId::from_account_id(contract_addr);
+                    let _r = sub_art_tradable_instance.transfer_ownership(self.env().caller());
+                    ensure!(_r.is_ok(), Error::TransferOwnershipFailed);
 
-                Ok(contract_addr)
-            }
+                    Ok(contract_addr)
+                }
             };
             let ans_contract_addr = instantiate_contract()?;
-  
+
             self.exists.insert(&ans_contract_addr, &true);
             self.env().emit_event(ContractCreated {
                 creator: self.env().caller(),
@@ -219,7 +221,7 @@ TransactionFailed,
             });
             Ok(())
         }
-        
+
         /// @notice Method for disabling existing SubArtTradable contract
         /// @param  tokenContractAddress Address of NFT contract
         #[ink(message)]
@@ -244,6 +246,11 @@ TransactionFailed,
         }
         #[cfg_attr(test, allow(unused_variables))]
         fn supports_interface_check(&self, callee: AccountId, data: [u8; 4]) -> bool {
+            #[cfg(test)]
+            {
+                ink_env::debug_println!("ans:{:?}", 1);
+                false
+            }
             #[cfg(not(test))]
             {
                 use ink_env::call::{build_call, Call, ExecutionInput};
@@ -270,8 +277,10 @@ TransactionFailed,
     mod tests {
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
-        use ink_lang as ink;
-
+        // use ink_lang as ink;
+        use ink_env::Clear;
+        type Event =
+            <sub_art_tradable::SubArtTradable as ::ink_lang::reflect::ContractEventBase>::Type;
         fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
         }
@@ -282,7 +291,11 @@ TransactionFailed,
         ) {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
                 .expect("encountered invalid contract event data buffer");
-            if let Event::ContractCreated(ContractCreated { token }) = decoded_event {
+            if let Event::ContractCreated(ContractCreated {
+                creator,
+                nft_address,
+            }) = decoded_event
+            {
                 assert_eq!(
                     creator, expected_creator,
                     "encountered invalid ContractCreated.creator"
@@ -303,7 +316,11 @@ TransactionFailed,
         ) {
             let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
                 .expect("encountered invalid contract event data buffer");
-            if let Event::ContractDisabled(ContractDisabled { token }) = decoded_event {
+            if let Event::ContractDisabled(ContractDisabled {
+                caller,
+                nft_address,
+            }) = decoded_event
+            {
                 assert_eq!(
                     caller, expected_caller,
                     "encountered invalid ContractDisabled.caller"
