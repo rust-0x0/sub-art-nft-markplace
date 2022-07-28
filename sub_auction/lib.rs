@@ -402,13 +402,19 @@ pub mod sub_auction {
         #[ink(message)]
         pub fn withdraw_bid(&mut self, nft_address: AccountId, token_id: TokenId) -> Result<()> {
             ensure!(!self.is_paused, Error::ContractPaused);
-            let highest_bid = self.highest_bids.get(&(nft_address, token_id)).unwrap();
+            let highest_bid = self
+                .highest_bids
+                .get(&(nft_address, token_id))
+                .unwrap_or_default();
             ensure!(
                 highest_bid.bidder == self.env().caller(),
                 Error::YouAreNotTheHighestBidder
             );
 
-            let auction = self.auctions.get((nft_address, token_id)).unwrap();
+            let auction = self
+                .auctions
+                .get((nft_address, token_id))
+                .unwrap_or_default();
             ensure!(
                 auction.end_time + 43200 <= self.get_now(),
                 Error::CanWithdrawOnlyAfter12HoursAfterAuctionEnded
@@ -437,14 +443,15 @@ pub mod sub_auction {
         #[ink(message)]
         pub fn result_auction(&mut self, nft_address: AccountId, token_id: TokenId) -> Result<()> {
             // Check the auction to see if it can be resulted
-            let mut auction = self.auctions.get((nft_address, token_id)).unwrap();
-            self.ensure_erc721_is_approved_for_all(
-                self.env().caller(),
-                self.env().account_id(),
-                nft_address,
-                token_id,
-                auction.owner,
-            )?;
+            let mut auction = self
+                .auctions
+                .get((nft_address, token_id))
+                .unwrap_or_default();
+            ensure!(
+                Some(self.env().caller()) == self.erc721_owner_of(nft_address, token_id)?
+                    && self.env().caller() == auction.owner,
+                Error::SenderMustBeItemOwner
+            );
 
             // Check the auction real
             ensure!(auction.end_time > 0, Error::NoAuctionExists);
@@ -453,19 +460,32 @@ pub mod sub_auction {
             // Ensure auction not already resulted
 
             ensure!(!auction.resulted, Error::AuctionAlreadyResulted);
-            let highest_bid = self.highest_bids.get(&(nft_address, token_id)).unwrap();
+            let highest_bid = self
+                .highest_bids
+                .get(&(nft_address, token_id))
+                .unwrap_or_default();
             ensure!(
                 highest_bid.bidder == self.env().caller(),
                 Error::YouAreNotTheHighestBidder
             );
             let winner = highest_bid.bidder;
             let winning_bid = highest_bid.bid;
-            ensure!(winner == AccountId::from([0x0; 32]), Error::NoOpenBids);
+            ensure!(winner != AccountId::from([0x0; 32]), Error::NoOpenBids);
             ensure!(
                 winning_bid >= auction.reserve_price,
                 Error::HighestBidIsBelowReservePrice
             );
+            ensure!(
+                self.erc721_is_approved_for_all(
+                    nft_address,
+                    self.env().caller(),
+                    self.env().account_id(),
+                )
+                .is_ok(),
+                Error::AuctioncNotApproved
+            );
             auction.resulted = true;
+            self.auctions.insert(&(nft_address, token_id), &auction);
             self.highest_bids.remove(&(nft_address, token_id));
             let mut pay_amount = winning_bid;
             if winning_bid > auction.reserve_price {
@@ -598,8 +618,15 @@ pub mod sub_auction {
         #[ink(message)]
         pub fn cancel_auction(&mut self, nft_address: AccountId, token_id: TokenId) -> Result<()> {
             // Check valid and not resulted
-            let auction = self.auctions.get((nft_address, token_id)).unwrap();
-            self.ensure_erc721_owner_of(nft_address, token_id, auction.owner)?;
+            let auction = self
+                .auctions
+                .get((nft_address, token_id))
+                .unwrap_or_default();
+            ensure!(
+                Some(self.env().caller()) == self.erc721_owner_of(nft_address, token_id)?
+                    && self.env().caller() == auction.owner,
+                Error::SenderMustBeItemOwner
+            );
             // Check the auction real
             ensure!(auction.end_time > 0, Error::NoAuctionExists);
             // Ensure auction not already resulted
@@ -608,7 +635,10 @@ pub mod sub_auction {
             Ok(())
         }
         fn _cancel_auction(&mut self, nft_address: AccountId, token_id: TokenId) -> Result<()> {
-            let highest_bid = self.highest_bids.get(&(nft_address, token_id)).unwrap();
+            let highest_bid = self
+                .highest_bids
+                .get(&(nft_address, token_id))
+                .unwrap_or_default();
             if highest_bid.bidder != AccountId::from([0x0; 32]) {
                 self._refund_highest_bidder(
                     nft_address,
@@ -690,7 +720,10 @@ pub mod sub_auction {
             token_id: TokenId,
             reserve_price: u128,
         ) -> Result<()> {
-            let mut auction = self.auctions.get(&(nft_address, token_id)).unwrap();
+            let mut auction = self
+                .auctions
+                .get(&(nft_address, token_id))
+                .unwrap_or_default();
 
             ensure!(
                 self.env().caller() == auction.owner,
@@ -727,7 +760,10 @@ pub mod sub_auction {
             token_id: TokenId,
             start_time: u128,
         ) -> Result<()> {
-            let mut auction = self.auctions.get(&(nft_address, token_id)).unwrap();
+            let mut auction = self
+                .auctions
+                .get(&(nft_address, token_id))
+                .unwrap_or_default();
 
             ensure!(
                 self.env().caller() == auction.owner,
@@ -771,7 +807,10 @@ pub mod sub_auction {
             token_id: TokenId,
             end_time: u128,
         ) -> Result<()> {
-            let mut auction = self.auctions.get(&(nft_address, token_id)).unwrap();
+            let mut auction = self
+                .auctions
+                .get(&(nft_address, token_id))
+                .unwrap_or_default();
 
             ensure!(
                 self.env().caller() == auction.owner,
@@ -822,7 +861,7 @@ pub mod sub_auction {
         @param fee_recipient payable address the address to sends the funds to
         */
         #[ink(message)]
-        pub fn update_fee_recipient(&mut self, fee_recipient: AccountId) -> Result<()> {
+        pub fn update_platform_fee_recipient(&mut self, fee_recipient: AccountId) -> Result<()> {
             //onlyOwner
             ensure!(self.env().caller() == self.owner, Error::OnlyOwner);
             self.fee_recipient = fee_recipient;
@@ -854,7 +893,10 @@ pub mod sub_auction {
         ) -> (AccountId, AccountId, Balance, Balance, u128, u128, bool) {
             // Check valid and not resulted
 
-            let auction = self.auctions.get((nft_address, token_id)).unwrap();
+            let auction = self
+                .auctions
+                .get((nft_address, token_id))
+                .unwrap_or_default();
             (
                 auction.owner,
                 auction.pay_token,
@@ -872,7 +914,10 @@ pub mod sub_auction {
             token_id: TokenId,
         ) -> (u128, bool) {
             // Check valid and not resulted
-            let auction = self.auctions.get((nft_address, token_id)).unwrap();
+            let auction = self
+                .auctions
+                .get((nft_address, token_id))
+                .unwrap_or_default();
             (auction.start_time, auction.resulted)
         }
         /**
@@ -885,7 +930,10 @@ pub mod sub_auction {
             nft_address: AccountId,
             token_id: TokenId,
         ) -> (AccountId, Balance, u128) {
-            let highest_bid = self.highest_bids.get(&(nft_address, token_id)).unwrap();
+            let highest_bid = self
+                .highest_bids
+                .get(&(nft_address, token_id))
+                .unwrap_or_default();
             (
                 highest_bid.bidder,
                 highest_bid.bid,
@@ -1094,7 +1142,10 @@ pub mod sub_auction {
             current_highest_bidder: AccountId,
             current_highest_bid: Balance,
         ) -> Result<()> {
-            let auction = self.auctions.get((nft_address, token_id)).unwrap();
+            let auction = self
+                .auctions
+                .get((nft_address, token_id))
+                .unwrap_or_default();
 
             if auction.pay_token == AccountId::from([0x0; 32]) {
                 // Send platform fee
@@ -1332,19 +1383,7 @@ pub mod sub_auction {
             );
             Ok(())
         }
-        fn ensure_erc721_owner_of(
-            &self,
-            nft_address: AccountId,
-            token_id: TokenId,
-            auction_owner: AccountId,
-        ) -> Result<()> {
-            ensure!(
-                Some(self.env().caller()) == self.erc721_owner_of(nft_address, token_id)?
-                    && self.env().caller() == auction_owner,
-                Error::SenderMustBeItemOwner
-            );
-            Ok(())
-        }
+
         fn get_marketplace_minters_royalties(
             &self,
             nft_address: AccountId,
@@ -1600,8 +1639,10 @@ pub mod sub_auction {
         fn set_balance(account_id: AccountId, balance: Balance) {
             ink_env::test::set_account_balance::<ink_env::DefaultEnvironment>(account_id, balance)
         }
-        fn set_block_timestamp() {
-            ink_env::test::advance_block::<ink_env::DefaultEnvironment>()
+        fn advance_blocks(increment_block_timestamps: u128) {
+            for _ in (0..increment_block_timestamps).step_by(6) {
+                ink_env::test::advance_block::<ink_env::DefaultEnvironment>();
+            }
         }
 
         fn get_balance(account_id: AccountId) -> Balance {
@@ -1640,7 +1681,6 @@ pub mod sub_auction {
         }
         #[ink::test]
         fn create_auction_works() {
-            let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
             let mut auction = init_contract();
             let caller = alice();
@@ -1696,7 +1736,6 @@ pub mod sub_auction {
 
         #[ink::test]
         fn place_bid_works() {
-            let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
             let mut auction = init_contract();
             let caller = alice();
@@ -1757,7 +1796,6 @@ pub mod sub_auction {
 
         #[ink::test]
         fn withdraw_bid_works() {
-            let accounts = ink_env::test::default_accounts::<ink_env::DefaultEnvironment>();
             // Create a new contract instance.
             let mut auction = init_contract();
             let caller = alice();
@@ -1787,9 +1825,7 @@ pub mod sub_auction {
                     resulted: false,
                 },
             );
-            for _ in (0..43200).step_by(6) {
-                set_block_timestamp();
-            }
+            advance_blocks(43200);
             assert_eq!(auction.get_now(), 43200);
             auction.highest_bids.insert(
                 &(nft_address, token_id),
@@ -1809,12 +1845,497 @@ pub mod sub_auction {
             assert_eq!(auction.highest_bids.get((nft_address, token_id)), None);
             let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
             assert_eq!(emitted_events.len(), 3);
+            assert_bid_refunded_event(
+                &emitted_events[1],
+                nft_address,
+                token_id,
+                caller,
+                bid_amount,
+            );
             assert_bid_withdrawn_event(
                 &emitted_events[2],
                 nft_address,
                 token_id,
                 caller,
                 bid_amount,
+            );
+        }
+
+        #[ink::test]
+        fn result_auction_works() {
+            // Create a new contract instance.
+            let mut auction = init_contract();
+            let caller = alice();
+            let nft_address: AccountId = alice();
+            let token_id: TokenId = 0;
+            let bid_amount: Balance = 10;
+
+            set_caller(caller);
+            // set_balance(caller,10);
+            // set_balance(fee_recipient(),0);
+            // ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(10);
+            let pay_token: AccountId = alice();
+            let reserve_price: Balance = 10;
+            let start_time: u128 = auction.get_now();
+            let min_bid_reserve: bool = true;
+            let end_time: u128 = start_time + 1;
+            let mut min_bid = reserve_price;
+            auction.auctions.insert(
+                &(nft_address, token_id),
+                &Auction {
+                    owner: caller,
+                    pay_token,
+                    min_bid,
+                    reserve_price,
+                    start_time,
+                    end_time,
+                    resulted: false,
+                },
+            );
+            advance_blocks(43212);
+            assert_eq!(auction.get_now(), 43212);
+            auction.highest_bids.insert(
+                &(nft_address, token_id),
+                &HighestBid {
+                    bidder: caller,
+                    bid: bid_amount,
+                    last_bid_time: auction.get_now(),
+                },
+            );
+            assert!(auction.result_auction(nft_address, token_id,).is_ok());
+            // assert_eq!(auction.result_auction(nft_address,
+            //     token_id,
+            // ).unwrap_err(),Error::AuctionAlreadyStarted);
+            // // Token 1 does not exists.
+
+            // assert_eq!(get_balance(fee_recipient()), 10);
+            assert_eq!(auction.auctions.get((nft_address, token_id)), None);
+            assert!(auction.highest_bids.get((nft_address, token_id)).is_none());
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 2);
+            let unit_price = 0;
+            assert_auction_resulted_event(
+                &emitted_events[1],
+                caller,
+                nft_address,
+                token_id,
+                caller,
+                pay_token,
+                unit_price,
+                bid_amount,
+            );
+        }
+
+        #[ink::test]
+        fn cancel_auction_works() {
+            // Create a new contract instance.
+            let mut auction = init_contract();
+            let caller = alice();
+            let nft_address: AccountId = alice();
+            let token_id: TokenId = 0;
+            let bid_amount: Balance = 10;
+
+            set_caller(caller);
+            // set_balance(caller,10);
+            // set_balance(fee_recipient(),0);
+            // ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(10);
+            let pay_token: AccountId = alice();
+            let reserve_price: Balance = 10;
+            let start_time: u128 = auction.get_now();
+            let min_bid_reserve: bool = true;
+            let end_time: u128 = start_time + 1;
+            let mut min_bid = reserve_price;
+            auction.auctions.insert(
+                &(nft_address, token_id),
+                &Auction {
+                    owner: caller,
+                    pay_token,
+                    min_bid,
+                    reserve_price,
+                    start_time,
+                    end_time,
+                    resulted: false,
+                },
+            );
+            auction.highest_bids.insert(
+                &(nft_address, token_id),
+                &HighestBid {
+                    bidder: caller,
+                    bid: bid_amount,
+                    last_bid_time: auction.get_now(),
+                },
+            );
+            assert!(auction.cancel_auction(nft_address, token_id,).is_ok());
+            // assert_eq!(auction.result_auction(nft_address,
+            //     token_id,
+            // ).unwrap_err(),Error::AuctionAlreadyStarted);
+            // // Token 1 does not exists.
+
+            // assert_eq!(get_balance(fee_recipient()), 10);
+            assert_eq!(auction.auctions.get((nft_address, token_id)), None);
+            assert!(auction.highest_bids.get((nft_address, token_id)).is_none());
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 3);
+            let unit_price = 0;
+            assert_auction_cancelled_event(&emitted_events[2], nft_address, token_id);
+        }
+
+        #[ink::test]
+        fn toggle_is_paused_works() {
+            // Create a new contract instance.
+            let mut auction = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let is_paused = auction.is_paused;
+            assert!(auction.toggle_is_paused().is_ok());
+
+            assert_eq!(auction.is_paused, !is_paused);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 2);
+            assert_pause_toggled_event(&emitted_events[1], !is_paused);
+        }
+
+        #[ink::test]
+        fn update_min_bid_increment_works() {
+            // Create a new contract instance.
+            let mut auction = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let min_bid_increment = 10;
+            assert!(auction.update_min_bid_increment(min_bid_increment).is_ok());
+
+            assert_eq!(auction.min_bid_increment, min_bid_increment);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 2);
+            assert_update_min_bid_increment_event(&emitted_events[1], min_bid_increment);
+        }
+
+        #[ink::test]
+        fn update_bid_withdrawal_lock_time_works() {
+            // Create a new contract instance.
+            let mut auction = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let bid_withdrawal_lock_time = 10;
+            assert!(auction
+                .update_bid_withdrawal_lock_time(bid_withdrawal_lock_time)
+                .is_ok());
+
+            assert_eq!(auction.bid_withdrawal_lock_time, bid_withdrawal_lock_time);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 2);
+            assert_update_bid_withdrawal_lock_time_event(
+                &emitted_events[1],
+                bid_withdrawal_lock_time,
+            );
+        }
+
+        #[ink::test]
+        fn update_auction_reserve_price_works() {
+            // Create a new contract instance.
+            let mut auction = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let nft_address: AccountId = alice();
+            let token_id: TokenId = 0;
+            let bid_amount: Balance = 10;
+            let pay_token: AccountId = alice();
+            let reserve_price: Balance = 10;
+            let start_time: u128 = auction.get_now();
+            let min_bid_reserve: bool = true;
+            let end_time: u128 = start_time + 300;
+            let mut min_bid = reserve_price;
+            auction.auctions.insert(
+                &(nft_address, token_id),
+                &Auction {
+                    owner: caller,
+                    pay_token,
+                    min_bid,
+                    reserve_price,
+                    start_time,
+                    end_time,
+                    resulted: false,
+                },
+            );
+            let auction_reserve_price = 10;
+            assert!(auction
+                .update_auction_reserve_price(nft_address, token_id, auction_reserve_price)
+                .is_ok());
+
+            assert_eq!(
+                auction
+                    .auctions
+                    .get(&(nft_address, token_id))
+                    .unwrap()
+                    .reserve_price,
+                auction_reserve_price
+            );
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 2);
+            assert_update_auction_reserve_price_event(
+                &emitted_events[1],
+                nft_address,
+                token_id,
+                pay_token,
+                auction_reserve_price,
+            );
+        }
+
+        #[ink::test]
+        fn update_auction_start_time_works() {
+            // Create a new contract instance.
+            let mut auction = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let nft_address: AccountId = alice();
+            let token_id: TokenId = 0;
+            let bid_amount: Balance = 10;
+            let pay_token: AccountId = alice();
+            let reserve_price: Balance = 10;
+            let start_time: u128 = auction.get_now() + 61;
+            let min_bid_reserve: bool = true;
+            let end_time: u128 = start_time + 302;
+            let mut min_bid = reserve_price;
+            auction.auctions.insert(
+                &(nft_address, token_id),
+                &Auction {
+                    owner: caller,
+                    pay_token,
+                    min_bid,
+                    reserve_price,
+                    start_time,
+                    end_time,
+                    resulted: false,
+                },
+            );
+            let auction_start_time = 10;
+            // assert_eq!(auction.update_auction_start_time(nft_address, token_id,auction_start_time
+            // ).unwrap_err(),Error::AuctionAlreadyStarted);
+            assert!(auction
+                .update_auction_start_time(nft_address, token_id, auction_start_time)
+                .is_ok());
+            assert_eq!(
+                auction
+                    .auctions
+                    .get(&(nft_address, token_id))
+                    .unwrap()
+                    .start_time,
+                auction_start_time
+            );
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 2);
+            assert_update_auction_start_time_event(
+                &emitted_events[1],
+                nft_address,
+                token_id,
+                auction_start_time,
+            );
+        }
+
+        #[ink::test]
+        fn update_auction_end_time_works() {
+            // Create a new contract instance.
+            let mut auction = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let nft_address: AccountId = alice();
+            let token_id: TokenId = 0;
+            let bid_amount: Balance = 10;
+            let pay_token: AccountId = alice();
+            let reserve_price: Balance = 10;
+            let start_time: u128 = auction.get_now() + 61;
+            let min_bid_reserve: bool = true;
+            let end_time: u128 = start_time + 302;
+            let mut min_bid = reserve_price;
+            auction.auctions.insert(
+                &(nft_address, token_id),
+                &Auction {
+                    owner: caller,
+                    pay_token,
+                    min_bid,
+                    reserve_price,
+                    start_time,
+                    end_time,
+                    resulted: false,
+                },
+            );
+            let auction_end_time = end_time + 10;
+            // assert_eq!(auction.update_auction_end_time(nft_address, token_id,auction_end_time
+            // ).unwrap_err(),Error::AuctionAlreadyStarted);
+            assert!(auction
+                .update_auction_end_time(nft_address, token_id, auction_end_time)
+                .is_ok());
+            assert_eq!(
+                auction
+                    .auctions
+                    .get(&(nft_address, token_id))
+                    .unwrap()
+                    .end_time,
+                auction_end_time
+            );
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 2);
+            assert_update_auction_end_time_event(
+                &emitted_events[1],
+                nft_address,
+                token_id,
+                auction_end_time,
+            );
+        }
+
+        #[ink::test]
+        fn update_platform_fee_works() {
+            // Create a new contract instance.
+            let mut auction = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let platform_fee = 10;
+            assert!(auction.update_platform_fee(platform_fee).is_ok());
+
+            assert_eq!(auction.platform_fee, platform_fee);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 2);
+            assert_update_platform_fee_event(&emitted_events[1], platform_fee);
+        }
+
+        #[ink::test]
+        fn update_platform_fee_recipient_works() {
+            // Create a new contract instance.
+            let mut auction = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let fee_recipient = bob();
+            assert!(auction.update_platform_fee_recipient(fee_recipient).is_ok());
+
+            assert_eq!(auction.fee_recipient, fee_recipient);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 2);
+            assert_update_platform_fee_recipient_event(&emitted_events[1], fee_recipient);
+        }
+
+        #[ink::test]
+        fn update_address_registry_works() {
+            // Create a new contract instance.
+            let mut auction = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let address_registry = bob();
+            assert!(auction.update_address_registry(address_registry).is_ok());
+
+            assert_eq!(auction.address_registry, address_registry);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_sub_auction_contract_deployed_event(&emitted_events[0]);
+        }
+
+        #[ink::test]
+        fn get_auction_works() {
+            // Create a new contract instance.
+            let mut auction = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let nft_address: AccountId = alice();
+            let token_id: TokenId = 1;
+            let pay_token: AccountId = alice();
+            let reserve_price: Balance = 10;
+            let start_time: u128 = auction.get_now();
+            let min_bid_reserve: bool = true;
+            let end_time: u128 = start_time;
+            let mut min_bid = reserve_price;
+            auction.auctions.insert(
+                &(nft_address, token_id),
+                &Auction {
+                    owner: caller,
+                    pay_token,
+                    min_bid,
+                    reserve_price,
+                    start_time,
+                    end_time,
+                    resulted: false,
+                },
+            );
+            assert_eq!(
+                auction.get_auction(nft_address, token_id),
+                (
+                    caller,
+                    pay_token,
+                    min_bid,
+                    reserve_price,
+                    start_time,
+                    end_time,
+                    false
+                )
+            );
+        }
+        #[ink::test]
+        fn get_auction_start_time_resulted_works() {
+            // Create a new contract instance.
+            let mut auction = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let nft_address: AccountId = alice();
+            let token_id: TokenId = 1;
+            let pay_token: AccountId = alice();
+            let reserve_price: Balance = 10;
+            let start_time: u128 = auction.get_now();
+            let min_bid_reserve: bool = true;
+            let min_bid = 0;
+            let end_time: u128 = start_time;
+            auction.auctions.insert(
+                &(nft_address, token_id),
+                &Auction {
+                    owner: caller,
+                    pay_token,
+                    min_bid,
+                    reserve_price,
+                    start_time,
+                    end_time,
+                    resulted: false,
+                },
+            );
+
+            assert_eq!(
+                auction.get_auction_start_time_resulted(nft_address, token_id),
+                (start_time, false)
+            );
+        }
+
+        #[ink::test]
+        fn get_highest_bid_works() {
+            // Create a new contract instance.
+            let mut auction = init_contract();
+            let caller = alice();
+            let nft_address: AccountId = alice();
+            let token_id: TokenId = 1;
+            let bid_amount: Balance = 10;
+
+            set_caller(caller);
+
+            auction.highest_bids.insert(
+                &(nft_address, token_id),
+                &HighestBid {
+                    bidder: caller,
+                    bid: bid_amount,
+                    last_bid_time: auction.get_now(),
+                },
+            );
+            assert_eq!(
+                auction.get_highest_bid(nft_address, token_id),
+                (caller, bid_amount, auction.get_now())
+            );
+        }
+
+        #[ink::test]
+        fn reclaim_erc20_fails() {
+            // Create a new contract instance.
+            let mut auction = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let token_contract: AccountId = AccountId::default();
+
+            assert_eq!(
+                auction.reclaim_erc20(token_contract).unwrap_err(),
+                Error::InvalidAddress
             );
         }
 
@@ -2090,7 +2611,7 @@ pub mod sub_auction {
                 );
             }
         }
-        fn assert_platform_fee_event(
+        fn assert_update_platform_fee_event(
             event: &ink_env::test::EmittedEvent,
             expected_platform_fee: Balance,
         ) {
@@ -2106,7 +2627,7 @@ pub mod sub_auction {
             }
         }
 
-        fn assert_platform_fee_recipient_event(
+        fn assert_update_platform_fee_recipient_event(
             event: &ink_env::test::EmittedEvent,
             expected_fee_recipient: AccountId,
         ) {

@@ -148,7 +148,7 @@ pub mod sub_nft_factory {
         @param fee_recipient payable address the address to sends the funds to
         */
         #[ink(message)]
-        pub fn update_fee_recipient(&mut self, fee_recipient: AccountId) -> Result<()> {
+        pub fn update_platform_fee_recipient(&mut self, fee_recipient: AccountId) -> Result<()> {
             //onlyOwner
             ensure!(self.env().caller() == self.owner, Error::OnlyOwner);
             self.fee_recipient = fee_recipient;
