@@ -213,53 +213,6 @@ mod sub_bundle_marketplace {
             })
         }
 
-        /// @notice Method for get NFT bundle listing
-        /// @param _owner Owner address
-        /// @param _bundleID Bundle ID
-        #[ink(message)]
-        #[cfg_attr(test, allow(unused_variables))]
-        pub fn get_listing(
-            &self,
-            owner: AccountId,
-            bundle_id: String,
-        ) -> (Vec<AccountId>, Vec<TokenId>, Vec<u128>, Balance, u128) {
-            let _bundle_id = self.get_bundle_id(&bundle_id);
-            let listing = self.listings.get(&(owner, _bundle_id)).unwrap();
-            (
-                listing.nft_addresses,
-                listing.token_ids,
-                listing.quantities,
-                listing.price,
-                listing.starting_time,
-            )
-        }
-
-        #[cfg_attr(test, allow(unused_variables))]
-        fn token_registry_enabled(&self, callee: AccountId, token: AccountId) -> Result<bool> {
-            #[cfg(test)]
-            {
-                ink_env::debug_println!("ans:{:?}", 1);
-                Ok(false)
-            }
-            #[cfg(not(test))]
-            {
-                use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C]; // token_registry_enabled
-                let (gas_limit, transferred_value) = (0, 0);
-                let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                    .call_type(
-                        Call::new()
-                            .callee(callee)
-                            .gas_limit(gas_limit)
-                            .transferred_value(transferred_value),
-                    )
-                    .exec_input(ExecutionInput::new(selector.into()).push_arg(token))
-                    .returns::<bool>()
-                    .fire()
-                    .map_err(|_| Error::TransactionFailed);
-                result
-            }
-        }
         /// @notice Method for listing NFT bundle
         /// @param _bundleID Bundle ID
         /// @param _nftAddresses Addresses of NFT contract
@@ -285,12 +238,12 @@ mod sub_bundle_marketplace {
                 nft_addresses.len() == token_ids.len() && quantities.len() == token_ids.len(),
                 Error::InvalidData
             );
-            let owner = self.owners.get(&_bundle_id).unwrap();
+            let owner = self.owners.get(&_bundle_id).unwrap_or_default();
 
             let mut listing = self
                 .listings
                 .get(&(self.env().caller(), _bundle_id.clone()))
-                .unwrap();
+                .unwrap_or_default();
             ensure!(
                 owner == AccountId::from([0x0; 32])
                     || (owner == self.env().caller() && listing.price == 0),
@@ -328,51 +281,45 @@ mod sub_bundle_marketplace {
                 let token_id = token_ids[i];
                 let quantity = quantities[i];
 
-                #[cfg(not(test))]
-                {
-                    if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
-                        ensure!(
-                            Some(self.env().caller())
-                                == self.erc721_owner_of(nft_address, token_id)?,
-                            Error::NotOwningItem
-                        );
-                        ensure!(
-                            self.erc721_is_approved_for_all(
-                                nft_address,
-                                self.env().caller(),
-                                self.env().account_id()
-                            )
-                            .unwrap_or(false),
-                            Error::ItemNotApproved
-                        );
-                        listing.quantities.push(1);
-                    } else if self
-                        .supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155)
-                    {
-                        ensure!(
-                            quantity
-                                <= self.erc1155_balance_of(nft_address, self.env().caller())?,
-                            Error::MustHoldEnoughNFTs
-                        );
-                        ensure!(
-                            self.erc1155_is_approved_for_all(
-                                nft_address,
-                                self.env().caller(),
-                                self.env().account_id()
-                            )
-                            .is_ok(),
-                            Error::ItemNotApproved
-                        );
-                    } else {
-                        ensure!(false, Error::InvalidNFTAddress);
-                    }
+                if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
+                    ensure!(
+                        Some(self.env().caller()) == self.erc721_owner_of(nft_address, token_id)?,
+                        Error::NotOwningItem
+                    );
+                    ensure!(
+                        self.erc721_is_approved_for_all(
+                            nft_address,
+                            self.env().caller(),
+                            self.env().account_id()
+                        )
+                        .unwrap_or(false),
+                        Error::ItemNotApproved
+                    );
+                    listing.quantities.push(1);
+                } else if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155) {
+                    ensure!(
+                        quantity <= self.erc1155_balance_of(nft_address, self.env().caller())?,
+                        Error::MustHoldEnoughNFTs
+                    );
+                    ensure!(
+                        self.erc1155_is_approved_for_all(
+                            nft_address,
+                            self.env().caller(),
+                            self.env().account_id()
+                        )
+                        .is_ok(),
+                        Error::ItemNotApproved
+                    );
+                    listing.quantities.push(quantity);
+                } else {
+                    ensure!(false, Error::InvalidNFTAddress);
                 }
                 listing.nft_addresses.push(nft_address);
                 listing.token_ids.push(token_id);
                 let mut items = self
                     .bundle_ids_per_item
                     .get(&(nft_address, token_id))
-                    .unwrap();
+                    .unwrap_or_default();
                 items.insert(_bundle_id.clone());
                 self.bundle_ids_per_item
                     .insert(&(nft_address, token_id), &items);
@@ -404,32 +351,9 @@ mod sub_bundle_marketplace {
             let listing = self
                 .listings
                 .get(&(self.env().caller(), _bundle_id))
-                .unwrap();
+                .unwrap_or_default();
             ensure!(listing.price > 0, Error::NotListedItem);
             self._cancel_listing(self.env().caller(), bundle_id)?;
-            Ok(())
-        }
-        fn _cancel_listing(&mut self, owner: AccountId, bundle_id: String) -> Result<()> {
-            let _bundle_id = self.get_bundle_id(&bundle_id);
-
-            let listing = self.listings.get(&(owner, _bundle_id.clone())).unwrap();
-            for (i, &nft_address) in listing.nft_addresses.iter().enumerate() {
-                let token_id = listing.token_ids[i];
-                let mut items = self
-                    .bundle_ids_per_item
-                    .get(&(nft_address, token_id))
-                    .unwrap();
-                items.remove(&_bundle_id);
-                self.bundle_ids_per_item
-                    .insert(&(nft_address, token_id), &items);
-                self.nft_indices
-                    .remove(&(_bundle_id.clone(), nft_address, token_id));
-            }
-
-            self.listings.remove(&(owner, _bundle_id.clone()));
-            self.owners.remove(&_bundle_id);
-            self.bundle_ids.remove(&_bundle_id);
-            self.env().emit_event(ItemCanceled { owner, bundle_id });
             Ok(())
         }
 
@@ -447,7 +371,7 @@ mod sub_bundle_marketplace {
             let mut listing = self
                 .listings
                 .get(&(self.env().caller(), _bundle_id.clone()))
-                .unwrap();
+                .unwrap_or_default();
             ensure!(listing.price > 0, Error::NotListedItem);
 
             self.valid_pay_token(pay_token)?;
@@ -474,52 +398,368 @@ mod sub_bundle_marketplace {
         pub fn buy_item(&mut self, bundle_id: String, pay_token: AccountId) -> Result<()> {
             let _bundle_id = self.get_bundle_id(&&bundle_id);
 
-            let owner = self.owners.get(&_bundle_id).unwrap();
+            let owner = self.owners.get(&_bundle_id).unwrap_or_default();
             ensure!(owner != AccountId::from([0x0; 32]), Error::InvalidId);
 
-            let listing = self.listings.get(&(owner, _bundle_id)).unwrap();
+            let listing = self.listings.get(&(owner, _bundle_id)).unwrap_or_default();
             ensure!(listing.pay_token == pay_token, Error::InvalidPayToken);
 
             self._buy_item(bundle_id, pay_token)?;
             Ok(())
         }
+
+        /// @notice Method for offering bundle item
+        /// @param _bundleID Bundle ID
+        /// @param _payToken Paying token
+        /// @param _price Price
+        /// @param _deadline Offer expiration
+        #[ink(message)]
+        pub fn create_offer(
+            &mut self,
+            bundle_id: String,
+            pay_token: AccountId,
+            price: Balance,
+            deadline: u128,
+        ) -> Result<()> {
+            let _bundle_id = self.get_bundle_id(&bundle_id);
+            let owner = self.owners.get(&_bundle_id).unwrap_or_default();
+            ensure!(AccountId::from([0x0; 32]) != owner, Error::InvalidId);
+            ensure!(deadline > self.get_now(), Error::InvalidExpiration);
+            ensure!(price > 0, Error::InvalidExpiration);
+            let offer = self
+                .offers
+                .get(&(_bundle_id.clone(), self.env().caller()))
+                .unwrap_or_default();
+            ensure!(offer.deadline <= self.get_now(), Error::OfferAlreadyCreated);
+
+            self.offers.insert(
+                &(_bundle_id.clone(), self.env().caller()),
+                &Offer {
+                    pay_token,
+                    price,
+                    deadline,
+                },
+            );
+            self.env().emit_event(OfferCreated {
+                creator: self.env().caller(),
+                bundle_id,
+                pay_token,
+                price,
+                deadline,
+            });
+            Ok(())
+        }
+        /// @notice Method for canceling the offer
+        /// @param _bundleID Bundle ID
+        #[ink(message)]
+        pub fn cancel_offer(&mut self, bundle_id: String) -> Result<()> {
+            let _bundle_id = self.get_bundle_id(&bundle_id);
+
+            let offer = self
+                .offers
+                .get(&(_bundle_id.clone(), self.env().caller()))
+                .unwrap_or_default();
+            ensure!(
+                offer.deadline > self.get_now(),
+                Error::OfferNotExistsOrExpired
+            );
+            self.offers
+                .remove(&(_bundle_id.clone(), self.env().caller()));
+            self.env().emit_event(OfferCanceled {
+                creator: self.env().caller(),
+                bundle_id,
+            });
+            Ok(())
+        }
+
+        /// @notice Method for accepting the offer
+        /// @param _bundleID Bundle ID
+        /// @param _creator Offer creator address
+        #[ink(message)]
+        pub fn accept_offer(&mut self, bundle_id: String, creator: AccountId) -> Result<()> {
+            let _bundle_id = self.get_bundle_id(&bundle_id);
+            let owner = self.owners.get(&_bundle_id).unwrap_or_default();
+            ensure!(owner == self.env().caller(), Error::NotOwningItem);
+            let offer = self
+                .offers
+                .get(&(_bundle_id.clone(), creator))
+                .unwrap_or_default();
+            ensure!(
+                offer.deadline > self.get_now(),
+                Error::OfferNotExistsOrExpired
+            );
+
+            let price = offer.price;
+            let fee_amount = price * self.platform_fee / 1000;
+            self.erc20_transfer_from(offer.pay_token, creator, self.fee_recipient, fee_amount)?;
+            self.erc20_transfer_from(
+                offer.pay_token,
+                self.env().caller(),
+                owner,
+                price - fee_amount,
+            )?;
+
+            let mut listing = self
+                .listings
+                .get(&(self.env().caller(), _bundle_id.clone()))
+                .unwrap_or_default();
+
+            for (i, &nft_address) in listing.nft_addresses.iter().enumerate() {
+                let token_id = listing.token_ids[i];
+                let quantity = listing.quantities[i];
+                // Transfer NFT to buyer
+                if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
+                    self.erc721_transfer_from(nft_address, self.env().caller(), creator, token_id)?;
+                } else if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155) {
+                    self.erc1155_transfer_from(
+                        nft_address,
+                        self.env().caller(),
+                        creator,
+                        token_id,
+                        quantity,
+                    )?;
+                }
+                self.marketplace_validate_item_sold(nft_address, token_id, owner, creator)?;
+            }
+            self.listings
+                .remove(&(self.env().caller(), _bundle_id.clone()));
+            listing.price = 0;
+            self.listings
+                .insert(&(creator, _bundle_id.clone()), &listing);
+            self.owners.insert(&_bundle_id, &creator);
+            self.offers.remove(&(_bundle_id.clone(), creator));
+
+            self.env().emit_event(ItemSold {
+                seller: self.env().caller(),
+                buyer: creator,
+                bundle_id: bundle_id.clone(),
+                pay_token: offer.pay_token,
+                unit_price: self.get_price(offer.pay_token)?,
+                price: offer.price,
+            });
+            self.env().emit_event(OfferCanceled { creator, bundle_id });
+            Ok(())
+        }
+
+        /**
+        @notice Method for updating platform fee
+        @dev Only admin
+        @param _platformFee uint256 the platform fee to set
+        */
+        #[ink(message)]
+        pub fn update_platform_fee(&mut self, platform_fee: Balance) -> Result<()> {
+            //onlyOwner
+            ensure!(self.env().caller() == self.owner, Error::OnlyOwner);
+            self.platform_fee = platform_fee;
+            self.env().emit_event(UpdatePlatformFee { platform_fee });
+            Ok(())
+        }
+        /**
+        @notice Method for updating platform fee address
+        @dev Only admin
+        @param fee_recipient payable address the address to sends the funds to
+        */
+        #[ink(message)]
+        pub fn update_platform_fee_recipient(&mut self, fee_recipient: AccountId) -> Result<()> {
+            //onlyOwner
+            ensure!(self.env().caller() == self.owner, Error::OnlyOwner);
+            self.fee_recipient = fee_recipient;
+            self.env()
+                .emit_event(UpdatePlatformFeeRecipient { fee_recipient });
+            Ok(())
+        }
+        /**
+        @notice Update SubAddressRegistry contract
+        @dev Only admin
+        */
+        #[ink(message)]
+        pub fn update_address_registry(&mut self, address_registry: AccountId) -> Result<()> {
+            //onlyOwner
+            ensure!(self.env().caller() == self.owner, Error::OnlyOwner);
+            self.address_registry = address_registry;
+
+            Ok(())
+        }
+
+        /**
+         * @notice Validate and cancel listing
+         * @dev Only bundle_marketplace can access
+         */
+        #[ink(message)]
+        pub fn validate_item_sold(
+            &mut self,
+            nft_address: AccountId,
+            token_id: TokenId,
+            quantity: u128,
+        ) -> Result<()> {
+            //onlyContract
+            #[cfg(not(test))]
+            {
+                let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
+                    ink_env::call::FromAccountId::from_account_id(self.address_registry);
+
+                ensure!(
+                    self.env().caller() == address_registry_instance.auction()
+                        || self.env().caller() == address_registry_instance.bundle_marketplace(),
+                    Error::SenderMustBeBundleMarketplace
+                );
+            }
+            let items = self
+                .bundle_ids_per_item
+                .get(&(nft_address, token_id))
+                .unwrap_or_default();
+            for _bundle_id in &items {
+                let owner = self.owners.get(&_bundle_id).unwrap_or_default();
+                if owner != AccountId::from([0x0; 32]) {
+                    let mut listing = self
+                        .listings
+                        .get(&(owner, _bundle_id.clone()))
+                        .unwrap_or_default();
+                    let bundle_id = self.bundle_ids.get(&_bundle_id).unwrap_or_default();
+                    let index = self
+                        .nft_indices
+                        .get(&(_bundle_id.clone(), nft_address, token_id))
+                        .unwrap() as usize;
+                    if listing.quantities[index] > quantity {
+                        listing.quantities[index] -= quantity;
+                        self.listings.insert(&(owner, _bundle_id.clone()), &listing);
+                    } else {
+                        self.nft_indices
+                            .remove(&(_bundle_id.clone(), nft_address, token_id));
+                        if listing.nft_addresses.len() == 1 {
+                            self.listings.remove(&(owner, _bundle_id.clone()));
+                            self.owners.remove(&_bundle_id);
+                            self.bundle_ids.remove(&_bundle_id);
+                            self.env().emit_event(ItemUpdated {
+                                owner: self.env().caller(),
+                                bundle_id,
+                                nft_addresses: Vec::new(),
+                                token_ids: Vec::new(),
+                                quantities: Vec::new(),
+                                pay_token: AccountId::from([0x0; 32]),
+                                new_price: 0,
+                            });
+                            continue;
+                        } else {
+                            let indexu = index as u128;
+                            if index < listing.nft_addresses.len() - 1 {
+                                listing.nft_addresses.swap_remove(index);
+                                listing.token_ids.swap_remove(index);
+                                listing.quantities.swap_remove(index);
+                                self.nft_indices.insert(
+                                    &(
+                                        _bundle_id.clone(),
+                                        listing.nft_addresses[index],
+                                        listing.token_ids[index],
+                                    ),
+                                    &indexu,
+                                );
+                            } else {
+                                listing.nft_addresses.pop();
+                                listing.token_ids.pop();
+                                listing.quantities.pop();
+                            }
+                            self.listings.insert(&(owner, _bundle_id.clone()), &listing);
+                        }
+                    }
+                    self.env().emit_event(ItemUpdated {
+                        owner: self.env().caller(),
+                        bundle_id,
+                        nft_addresses: listing.nft_addresses,
+                        token_ids: listing.token_ids,
+                        quantities: listing.quantities,
+                        pay_token: listing.pay_token,
+                        new_price: listing.price,
+                    });
+                }
+            }
+
+            self.bundle_ids_per_item.remove(&(nft_address, token_id));
+            Ok(())
+        }
+
+        /// @notice Method for get NFT bundle listing
+        /// @param _owner Owner address
+        /// @param _bundleID Bundle ID
+        #[ink(message)]
+        #[cfg_attr(test, allow(unused_variables))]
+        pub fn get_listing(
+            &self,
+            owner: AccountId,
+            bundle_id: String,
+        ) -> (Vec<AccountId>, Vec<TokenId>, Vec<u128>, Balance, u128) {
+            let _bundle_id = self.get_bundle_id(&bundle_id);
+            let listing = self.listings.get(&(owner, _bundle_id)).unwrap_or_default();
+            (
+                listing.nft_addresses,
+                listing.token_ids,
+                listing.quantities,
+                listing.price,
+                listing.starting_time,
+            )
+        }
+    }
+    #[ink(impl)]
+    impl SubBundleMarketplace {
+        fn _cancel_listing(&mut self, owner: AccountId, bundle_id: String) -> Result<()> {
+            let _bundle_id = self.get_bundle_id(&bundle_id);
+
+            let listing = self
+                .listings
+                .get(&(owner, _bundle_id.clone()))
+                .unwrap_or_default();
+            for (i, &nft_address) in listing.nft_addresses.iter().enumerate() {
+                let token_id = listing.token_ids[i];
+                let mut items = self
+                    .bundle_ids_per_item
+                    .get(&(nft_address, token_id))
+                    .unwrap_or_default();
+                items.remove(&_bundle_id);
+                self.bundle_ids_per_item
+                    .insert(&(nft_address, token_id), &items);
+                self.nft_indices
+                    .remove(&(_bundle_id.clone(), nft_address, token_id));
+            }
+
+            self.listings.remove(&(owner, _bundle_id.clone()));
+            self.owners.remove(&_bundle_id);
+            self.bundle_ids.remove(&_bundle_id);
+            self.env().emit_event(ItemCanceled { owner, bundle_id });
+            Ok(())
+        }
         fn _buy_item(&mut self, bundle_id: String, pay_token: AccountId) -> Result<()> {
             let _bundle_id = self.get_bundle_id(&bundle_id);
-            let owner = self.owners.get(&_bundle_id).unwrap();
-            let mut listing = self.listings.get(&(owner, _bundle_id.clone())).unwrap();
+            let owner = self.owners.get(&_bundle_id).unwrap_or_default();
+            let mut listing = self
+                .listings
+                .get(&(owner, _bundle_id.clone()))
+                .unwrap_or_default();
             ensure!(listing.price > 0, Error::NotListedItem);
 
             for (i, &nft_address) in listing.nft_addresses.iter().enumerate() {
                 let token_id = listing.token_ids[i];
                 let quantity = listing.quantities[i];
-
-                #[cfg(not(test))]
-                {
-                    if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
-                        ensure!(
-                            Some(self.env().caller())
-                                == self.erc721_owner_of(nft_address, token_id)?,
-                            Error::NotOwningItem
-                        );
-                        ensure!(
-                            self.erc721_is_approved_for_all(
-                                nft_address,
-                                self.env().caller(),
-                                self.env().account_id()
-                            )
-                            .unwrap_or(false),
-                            Error::ItemNotApproved
-                        );
-                    } else if self
-                        .supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155)
-                    {
-                        ensure!(
-                            quantity <= self.erc1155_balance_of(nft_address, owner)?,
-                            Error::MustHoldEnoughNFTs
-                        );
-                    } else {
-                        ensure!(false, Error::InvalidNFTAddress);
-                    }
+                if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
+                    ensure!(
+                        Some(self.env().caller()) == self.erc721_owner_of(nft_address, token_id)?,
+                        Error::NotOwningItem
+                    );
+                    ensure!(
+                        self.erc721_is_approved_for_all(
+                            nft_address,
+                            self.env().caller(),
+                            self.env().account_id()
+                        )
+                        .unwrap_or(false),
+                        Error::ItemNotApproved
+                    );
+                } else if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155) {
+                    ensure!(
+                        quantity <= self.erc1155_balance_of(nft_address, owner)?,
+                        Error::MustHoldEnoughNFTs
+                    );
+                } else {
+                    ensure!(false, Error::InvalidNFTAddress);
                 }
             }
 
@@ -567,34 +807,23 @@ mod sub_bundle_marketplace {
             for (i, &nft_address) in listing.nft_addresses.iter().enumerate() {
                 let token_id = listing.token_ids[i];
                 let quantity = listing.quantities[i];
-
-                #[cfg(not(test))]
-                {
-                    if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
-                        self.erc721_transfer_from(
-                            nft_address,
-                            owner,
-                            self.env().caller(),
-                            token_id,
-                        )?;
-                    } else if self
-                        .supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155)
-                    {
-                        self.erc1155_transfer_from(
-                            nft_address,
-                            owner,
-                            self.env().caller(),
-                            token_id,
-                            quantity,
-                        )?;
-                    }
-                    self.marketplace_validate_item_sold(
+                if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
+                    self.erc721_transfer_from(nft_address, owner, self.env().caller(), token_id)?;
+                } else if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155) {
+                    self.erc1155_transfer_from(
                         nft_address,
-                        token_id,
                         owner,
                         self.env().caller(),
+                        token_id,
+                        quantity,
                     )?;
                 }
+                self.marketplace_validate_item_sold(
+                    nft_address,
+                    token_id,
+                    owner,
+                    self.env().caller(),
+                )?;
             }
             self.listings.remove(&(owner, _bundle_id.clone()));
             listing.price = 0;
@@ -616,6 +845,7 @@ mod sub_bundle_marketplace {
             });
             Ok(())
         }
+        #[cfg_attr(test, allow(unused_variables))]
         fn marketplace_validate_item_sold(
             &self,
             nft_address: AccountId,
@@ -629,11 +859,11 @@ mod sub_bundle_marketplace {
                     ink_env::call::FromAccountId::from_account_id(self.address_registry);
 
                 ensure!(
-                    AccountId::from([0x0; 32]) == address_registry_instance.marketplace(),
+                    AccountId::from([0x0; 32]) == address_registry_instance.bundle_marketplace(),
                     Error::InvalidPayToken
                 );
                 self._marketplace_validate_item_sold(
-                    address_registry_instance.marketplace(),
+                    address_registry_instance.bundle_marketplace(),
                     nft_address,
                     token_id,
                     seller,
@@ -642,6 +872,7 @@ mod sub_bundle_marketplace {
             }
             Ok(())
         }
+        #[cfg_attr(test, allow(unused_variables))]
         fn _marketplace_validate_item_sold(
             &self,
             token: AccountId,
@@ -676,6 +907,7 @@ mod sub_bundle_marketplace {
             }
             Ok(())
         }
+        #[cfg_attr(test, allow(unused_variables))]
         fn erc1155_is_approved_for_all(
             &self,
             token: AccountId,
@@ -685,7 +917,7 @@ mod sub_bundle_marketplace {
             #[cfg(test)]
             {
                 ink_env::debug_println!("ans:{:?}", 1);
-                Ok(false)
+                Ok(true)
             }
             #[cfg(not(test))]
             {
@@ -710,7 +942,7 @@ mod sub_bundle_marketplace {
                 result
             }
         }
-
+        #[cfg_attr(test, allow(unused_variables))]
         fn marketplace_get_price(
             &self,
             token: AccountId,
@@ -719,7 +951,7 @@ mod sub_bundle_marketplace {
             #[cfg(test)]
             {
                 ink_env::debug_println!("ans:{:?}", 1);
-                Ok(Balance::default())
+                Ok(1)
             }
             #[cfg(not(test))]
             {
@@ -740,146 +972,7 @@ mod sub_bundle_marketplace {
                 result
             }
         }
-        /// @notice Method for offering bundle item
-        /// @param _bundleID Bundle ID
-        /// @param _payToken Paying token
-        /// @param _price Price
-        /// @param _deadline Offer expiration
-        #[ink(message)]
-        pub fn create_offer(
-            &mut self,
-            bundle_id: String,
-            pay_token: AccountId,
-            price: Balance,
-            deadline: u128,
-        ) -> Result<()> {
-            let _bundle_id = self.get_bundle_id(&bundle_id);
-            let owner = self.owners.get(&_bundle_id).unwrap();
-            ensure!(AccountId::from([0x0; 32]) != owner, Error::InvalidId);
-            ensure!(deadline > self.get_now(), Error::InvalidExpiration);
-            ensure!(price > 0, Error::InvalidExpiration);
-            let offer = self
-                .offers
-                .get(&(_bundle_id.clone(), self.env().caller()))
-                .unwrap();
-            ensure!(offer.deadline <= self.get_now(), Error::OfferAlreadyCreated);
-
-            self.offers.insert(
-                &(_bundle_id.clone(), self.env().caller()),
-                &Offer {
-                    pay_token,
-                    price,
-                    deadline,
-                },
-            );
-            self.env().emit_event(OfferCreated {
-                creator: self.env().caller(),
-                bundle_id,
-                pay_token,
-                price,
-                deadline,
-            });
-            Ok(())
-        }
-        /// @notice Method for canceling the offer
-        /// @param _bundleID Bundle ID
-        #[ink(message)]
-        pub fn cancel_offer(&mut self, bundle_id: String) -> Result<()> {
-            let _bundle_id = self.get_bundle_id(&bundle_id);
-
-            let offer = self
-                .offers
-                .get(&(_bundle_id.clone(), self.env().caller()))
-                .unwrap();
-            ensure!(
-                offer.deadline > self.get_now(),
-                Error::OfferNotExistsOrExpired
-            );
-            self.offers
-                .remove(&(_bundle_id.clone(), self.env().caller()));
-            self.env().emit_event(OfferCanceled {
-                creator: self.env().caller(),
-                bundle_id,
-            });
-            Ok(())
-        }
-
-        /// @notice Method for accepting the offer
-        /// @param _bundleID Bundle ID
-        /// @param _creator Offer creator address
-        #[ink(message)]
-        pub fn accept_offer(&mut self, bundle_id: String, creator: AccountId) -> Result<()> {
-            let _bundle_id = self.get_bundle_id(&bundle_id);
-            let owner = self.owners.get(&_bundle_id).unwrap();
-            ensure!(owner == self.env().caller(), Error::NotOwningItem);
-            let offer = self.offers.get(&(_bundle_id.clone(), creator)).unwrap();
-            ensure!(
-                offer.deadline > self.get_now(),
-                Error::OfferNotExistsOrExpired
-            );
-
-            let price = offer.price;
-            let fee_amount = price * self.platform_fee / 1000;
-            self.erc20_transfer_from(offer.pay_token, creator, self.fee_recipient, fee_amount)?;
-            self.erc20_transfer_from(
-                offer.pay_token,
-                self.env().caller(),
-                owner,
-                price - fee_amount,
-            )?;
-
-            let mut listing = self
-                .listings
-                .get(&(self.env().caller(), _bundle_id.clone()))
-                .unwrap();
-
-            for (i, &nft_address) in listing.nft_addresses.iter().enumerate() {
-                let token_id = listing.token_ids[i];
-                let quantity = listing.quantities[i];
-
-                #[cfg(not(test))]
-                {
-                    // Transfer NFT to buyer
-                    if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
-                        self.erc721_transfer_from(
-                            nft_address,
-                            self.env().caller(),
-                            creator,
-                            token_id,
-                        )?;
-                    } else if self
-                        .supports_interface_check(nft_address, crate::INTERFACE_ID_ERC1155)
-                    {
-                        self.erc1155_transfer_from(
-                            nft_address,
-                            self.env().caller(),
-                            creator,
-                            token_id,
-                            quantity,
-                        )?;
-                    }
-                    self.marketplace_validate_item_sold(nft_address, token_id, owner, creator)?;
-                }
-            }
-            self.listings
-                .remove(&(self.env().caller(), _bundle_id.clone()));
-            listing.price = 0;
-            self.listings
-                .insert(&(creator, _bundle_id.clone()), &listing);
-            self.owners.insert(&_bundle_id, &creator);
-            self.offers.remove(&(_bundle_id.clone(), creator));
-
-            self.env().emit_event(ItemSold {
-                seller: self.env().caller(),
-                buyer: creator,
-                bundle_id: bundle_id.clone(),
-                pay_token: offer.pay_token,
-                unit_price: self.get_price(offer.pay_token)?,
-                price: offer.price,
-            });
-            self.env().emit_event(OfferCanceled { creator, bundle_id });
-            Ok(())
-        }
+        #[cfg_attr(test, allow(unused_variables))]
         fn erc721_transfer_from(
             &mut self,
             token: AccountId,
@@ -911,6 +1004,7 @@ mod sub_bundle_marketplace {
             }
             Ok(())
         }
+        #[cfg_attr(test, allow(unused_variables))]
         fn erc1155_transfer_from(
             &mut self,
             token: AccountId,
@@ -945,6 +1039,7 @@ mod sub_bundle_marketplace {
             }
             Ok(())
         }
+        #[cfg_attr(test, allow(unused_variables))]
         fn erc20_transfer_from(
             &mut self,
             token: AccountId,
@@ -976,7 +1071,7 @@ mod sub_bundle_marketplace {
             }
             Ok(())
         }
-
+        #[cfg_attr(test, allow(unused_variables))]
         fn erc721_is_approved_for_all(
             &self,
             token: AccountId,
@@ -986,7 +1081,7 @@ mod sub_bundle_marketplace {
             #[cfg(test)]
             {
                 ink_env::debug_println!("ans:{:?}", 1);
-                Ok(false)
+                Ok(true)
             }
             #[cfg(not(test))]
             {
@@ -1011,7 +1106,7 @@ mod sub_bundle_marketplace {
                 result
             }
         }
-
+        #[cfg_attr(test, allow(unused_variables))]
         fn erc721_owner_of(
             &self,
             token: AccountId,
@@ -1020,7 +1115,7 @@ mod sub_bundle_marketplace {
             #[cfg(test)]
             {
                 ink_env::debug_println!("ans:{:?}", 1);
-                Ok(Some(AccountId::default()))
+                Ok(Some(AccountId::from([0x1; 32])))
             }
             #[cfg(not(test))]
             {
@@ -1041,12 +1136,12 @@ mod sub_bundle_marketplace {
                 result
             }
         }
-
+        #[cfg_attr(test, allow(unused_variables))]
         fn get_price(&self, pay_token: AccountId) -> Result<Balance> {
             #[cfg(test)]
             {
                 ink_env::debug_println!("ans:{:?}", 1);
-                Ok(Balance::default())
+                Ok(1)
             }
             #[cfg(not(test))]
             {
@@ -1056,7 +1151,10 @@ mod sub_bundle_marketplace {
                 );
                 let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
                     ink_env::call::FromAccountId::from_account_id(self.address_registry);
-                self.marketplace_get_price(address_registry_instance.marketplace(), pay_token)
+                self.marketplace_get_price(
+                    address_registry_instance.bundle_marketplace(),
+                    pay_token,
+                )
             }
         }
         #[cfg_attr(test, allow(unused_variables))]
@@ -1085,11 +1183,12 @@ mod sub_bundle_marketplace {
             }
             Ok(())
         }
+        #[cfg_attr(test, allow(unused_variables))]
         fn erc1155_balance_of(&self, token: AccountId, owner: AccountId) -> Result<Balance> {
             #[cfg(test)]
             {
                 ink_env::debug_println!("ans:{:?}", 1);
-                Ok(Balance::default())
+                Ok(1)
             }
             #[cfg(not(test))]
             {
@@ -1138,7 +1237,7 @@ mod sub_bundle_marketplace {
             #[cfg(test)]
             {
                 ink_env::debug_println!("ans:{:?}", 1);
-                false
+                true
             }
             #[cfg(not(test))]
             {
@@ -1158,146 +1257,33 @@ mod sub_bundle_marketplace {
                     .map_err(|_| Error::TransactionFailed);
                 result.unwrap_or(false)
             }
-            // #[cfg(test)]
-            // {
-            //     ink_env::debug_println!("ans:{:?}",  ans);
-            // }
         }
-
-        /**
-        @notice Method for updating platform fee
-        @dev Only admin
-        @param _platformFee uint256 the platform fee to set
-        */
-        #[ink(message)]
-        pub fn update_platform_fee(&mut self, platform_fee: Balance) -> Result<()> {
-            //onlyOwner
-            ensure!(self.env().caller() == self.owner, Error::OnlyOwner);
-            self.platform_fee = platform_fee;
-            self.env().emit_event(UpdatePlatformFee { platform_fee });
-            Ok(())
-        }
-        /**
-        @notice Method for updating platform fee address
-        @dev Only admin
-        @param fee_recipient payable address the address to sends the funds to
-        */
-        #[ink(message)]
-        pub fn update_platform_fee_recipient(&mut self, fee_recipient: AccountId) -> Result<()> {
-            //onlyOwner
-            ensure!(self.env().caller() == self.owner, Error::OnlyOwner);
-            self.fee_recipient = fee_recipient;
-            self.env()
-                .emit_event(UpdatePlatformFeeRecipient { fee_recipient });
-            Ok(())
-        }
-        /**
-        @notice Update SubAddressRegistry contract
-        @dev Only admin
-        */
-        #[ink(message)]
-        pub fn update_address_registry(&mut self, address_registry: AccountId) -> Result<()> {
-            //onlyOwner
-            ensure!(self.env().caller() == self.owner, Error::OnlyOwner);
-            self.address_registry = address_registry;
-
-            Ok(())
-        }
-
-        /**
-         * @notice Validate and cancel listing
-         * @dev Only marketplace can access
-         */
-        #[ink(message)]
-        pub fn validate_item_sold(
-            &mut self,
-            nft_address: AccountId,
-            token_id: TokenId,
-            quantity: u128,
-        ) -> Result<()> {
-            //onlyContract
+        #[cfg_attr(test, allow(unused_variables))]
+        fn token_registry_enabled(&self, callee: AccountId, token: AccountId) -> Result<bool> {
+            #[cfg(test)]
+            {
+                ink_env::debug_println!("ans:{:?}", 1);
+                Ok(true)
+            }
             #[cfg(not(test))]
             {
-                let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
-                    ink_env::call::FromAccountId::from_account_id(self.address_registry);
-
-                ensure!(
-                    self.env().caller() == address_registry_instance.auction()
-                        || self.env().caller() == address_registry_instance.marketplace(),
-                    Error::SenderMustBeBundleMarketplace
-                );
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0x14, 0x14, 0x63, 0x1C]; // token_registry_enabled
+                let (gas_limit, transferred_value) = (0, 0);
+                let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
+                    .call_type(
+                        Call::new()
+                            .callee(callee)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(ExecutionInput::new(selector.into()).push_arg(token))
+                    .returns::<bool>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                result
             }
-            let items = self
-                .bundle_ids_per_item
-                .get(&(nft_address, token_id))
-                .unwrap();
-            for _bundle_id in &items {
-                let owner = self.owners.get(&_bundle_id).unwrap();
-                if owner != AccountId::from([0x0; 32]) {
-                    let mut listing = self.listings.get(&(owner, _bundle_id.clone())).unwrap();
-                    let bundle_id = self.bundle_ids.get(&_bundle_id).unwrap();
-                    let index = self
-                        .nft_indices
-                        .get(&(_bundle_id.clone(), nft_address, token_id))
-                        .unwrap() as usize;
-                    if listing.quantities[index] > quantity {
-                        listing.quantities[index] -= quantity;
-                    } else {
-                        self.nft_indices
-                            .remove(&(_bundle_id.clone(), nft_address, token_id));
-                        if listing.nft_addresses.len() == 1 {
-                            self.listings.remove(&(owner, _bundle_id.clone()));
-                            self.owners.remove(&_bundle_id);
-                            self.bundle_ids.remove(&_bundle_id);
-                            self.env().emit_event(ItemUpdated {
-                                owner: self.env().caller(),
-                                bundle_id,
-                                nft_addresses: Vec::new(),
-                                token_ids: Vec::new(),
-                                quantities: Vec::new(),
-                                pay_token: AccountId::from([0x0; 32]),
-                                new_price: 0,
-                            });
-                            continue;
-                        } else {
-                            let indexu = index as u128;
-                            if index < listing.nft_addresses.len() - 1 {
-                                let last_index = listing.nft_addresses.len() - 1;
-                                listing.nft_addresses.swap(index, last_index);
-                                let last_index = listing.token_ids.len() - 1;
-                                listing.token_ids.swap(index, last_index);
-                                let last_index = listing.quantities.len() - 1;
-                                listing.quantities.swap(index, last_index);
-                                self.nft_indices.insert(
-                                    &(
-                                        _bundle_id.clone(),
-                                        listing.nft_addresses[index],
-                                        listing.token_ids[index],
-                                    ),
-                                    &indexu,
-                                );
-                            }
-                            listing.nft_addresses.pop();
-                            listing.token_ids.pop();
-                            listing.quantities.pop();
-                        }
-                    }
-                    self.env().emit_event(ItemUpdated {
-                        owner: self.env().caller(),
-                        bundle_id,
-                        nft_addresses: listing.nft_addresses,
-                        token_ids: listing.token_ids,
-                        quantities: listing.quantities,
-                        pay_token: listing.pay_token,
-                        new_price: listing.price,
-                    });
-                }
-            }
-
-            self.bundle_ids_per_item.remove(&(nft_address, token_id));
-            Ok(())
         }
-
         fn get_now(&self) -> u128 {
             self.env().block_timestamp().into()
         }
@@ -1314,7 +1300,6 @@ mod sub_bundle_marketplace {
             bundle_id.clone()
         }
     }
-
     /// Unit tests
     #[cfg(test)]
     mod tests {
@@ -1341,12 +1326,601 @@ mod sub_bundle_marketplace {
         fn charlie() -> AccountId {
             default_accounts().charlie
         }
+        fn django() -> AccountId {
+            default_accounts().django
+        }
 
+        fn eve() -> AccountId {
+            default_accounts().eve
+        }
+
+        fn frank() -> AccountId {
+            default_accounts().frank
+        }
         fn init_contract() -> SubBundleMarketplace {
-            let mut erc = SubBundleMarketplace::new(alice(), 0);
+            let erc = SubBundleMarketplace::new(alice(), 0);
 
             erc
         }
+        #[ink::test]
+        fn list_item_works() {
+            // Create a new contract instance.
+            let mut bundle_marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let bundle_id = String::from("1");
+            let nft_addresses = vec![charlie()];
+            let token_ids = vec![1];
+            let quantities = vec![1];
+            let pay_token = alice();
+            let price = 10;
+            let starting_time = 10;
+            // assert_eq!( bundle_marketplace.list_item(
+            //   nft_address,
+            //         token_id,
+            //         quantity,
+            //         pay_token,
+            //         price_per_item,
+            //         starting_time,
+            // ).unwrap_err(),Error::NotOwningItem);
+            assert!(bundle_marketplace
+                .list_item(
+                    bundle_id.clone(),
+                    nft_addresses.clone(),
+                    token_ids.clone(),
+                    quantities.clone(),
+                    pay_token,
+                    price,
+                    starting_time,
+                )
+                .is_ok());
+            let _bundle_id = bundle_marketplace.get_bundle_id(&bundle_id);
+            assert_eq!(
+                bundle_marketplace.listings.get(&(caller, _bundle_id)),
+                Some(Listing {
+                    nft_addresses,
+                    token_ids,
+                    quantities,
+                    pay_token,
+                    price,
+                    starting_time,
+                })
+            );
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_item_listed_event(
+                &emitted_events[0],
+                caller,
+                bundle_id,
+                pay_token,
+                price,
+                starting_time,
+            );
+        }
+
+        #[ink::test]
+        fn cancel_listing_works() {
+            // Create a new contract instance.
+            let mut bundle_marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let bundle_id = String::from("1");
+            let nft_addresses = vec![alice()];
+            let token_ids = vec![1];
+            let quantities = vec![1];
+            let pay_token = alice();
+            let price = 10;
+            let starting_time = 10;
+            let _bundle_id = bundle_marketplace.get_bundle_id(&bundle_id);
+
+            bundle_marketplace.listings.insert(
+                &(caller, _bundle_id),
+                &Listing {
+                    nft_addresses,
+                    token_ids,
+                    quantities,
+                    pay_token,
+                    price,
+                    starting_time,
+                },
+            );
+            let bundle_id = String::from("1");
+            let nft_addresses = vec![alice()];
+            let token_ids = vec![1];
+            // assert_eq!( bundle_marketplace.cancel_listing(
+            //   nft_address,
+            //         token_id,
+            // ).unwrap_err(),Error::NotOwningItem);
+            assert!(bundle_marketplace.cancel_listing(bundle_id.clone()).is_ok());
+            let _bundle_id = bundle_marketplace.get_bundle_id(&bundle_id);
+
+            for (i, &nft_address) in nft_addresses.iter().enumerate() {
+                let token_id = token_ids[i];
+                assert!(bundle_marketplace
+                    .bundle_ids_per_item
+                    .get(&(nft_address, token_id))
+                    .unwrap_or_default()
+                    .get(&_bundle_id)
+                    .is_none());
+
+                assert!(bundle_marketplace
+                    .nft_indices
+                    .get(&(_bundle_id.clone(), nft_address, token_id))
+                    .is_none());
+            }
+            assert_eq!(bundle_marketplace.owners.get(&_bundle_id), None);
+            assert_eq!(bundle_marketplace.bundle_ids.get(&_bundle_id), None);
+            assert_eq!(bundle_marketplace.listings.get(&(caller, _bundle_id)), None);
+
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_item_canceled_event(&emitted_events[0], caller, bundle_id);
+        }
+
+        #[ink::test]
+        fn update_listing_works() {
+            // Create a new contract instance.
+            let mut bundle_marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let bundle_id = String::from("1");
+            let nft_addresses = vec![alice()];
+            let token_ids = vec![1];
+            let quantities = vec![1];
+            let pay_token = alice();
+            let price = 10;
+            let starting_time = 10;
+            let _bundle_id = bundle_marketplace.get_bundle_id(&bundle_id);
+            bundle_marketplace.listings.insert(
+                &(caller, _bundle_id.clone()),
+                &Listing {
+                    nft_addresses,
+                    token_ids,
+                    quantities,
+                    pay_token,
+                    price,
+                    starting_time,
+                },
+            );
+            let bundle_id = String::from("1");
+            let nft_addresses = vec![alice()];
+            let token_ids = vec![1];
+            let quantities = vec![1];
+            let new_pay_token = eve();
+            let new_price = 11;
+            // assert_eq!( bundle_marketplace.update_listing(
+            //   nft_address,
+            //         token_id,
+            // ).unwrap_err(),Error::NotOwningItem);
+            assert!(bundle_marketplace
+                .update_listing(bundle_id.clone(), new_pay_token, new_price)
+                .is_ok());
+
+            assert_eq!(
+                bundle_marketplace.listings.get(&(caller, _bundle_id)),
+                Some(Listing {
+                    nft_addresses,
+                    token_ids,
+                    quantities,
+                    pay_token: new_pay_token,
+                    price: new_price,
+                    starting_time,
+                })
+            );
+            let nft_addresses = vec![alice()];
+            let token_ids = vec![1];
+            let quantities = vec![1];
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_item_updated_event(
+                &emitted_events[0],
+                caller,
+                bundle_id,
+                nft_addresses,
+                token_ids,
+                quantities,
+                new_pay_token,
+                new_price,
+            );
+        }
+
+        #[ink::test]
+        fn buy_item_works() {
+            // Create a new contract instance.
+            let mut bundle_marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let bundle_id = String::from("1");
+            let nft_addresses = vec![alice()];
+            let token_ids = vec![1];
+            let quantities = vec![1];
+            let pay_token = alice();
+            let price = 10;
+            let starting_time = bundle_marketplace.get_now();
+            let owner = bob();
+            let _bundle_id = bundle_marketplace.get_bundle_id(&bundle_id);
+            bundle_marketplace.listings.insert(
+                &(owner, _bundle_id.clone()),
+                &Listing {
+                    nft_addresses,
+                    token_ids,
+                    quantities,
+                    pay_token,
+                    price,
+                    starting_time,
+                },
+            );
+            bundle_marketplace.owners.insert(&_bundle_id, &owner);
+            // assert_eq!( bundle_marketplace.buy_item(
+            //   nft_address,
+            //         token_id, pay_token, owner
+            // ).unwrap_err(),Error::NotOwningItem);
+            assert!(bundle_marketplace
+                .buy_item(bundle_id.clone(), pay_token)
+                .is_ok());
+
+            assert_eq!(
+                bundle_marketplace
+                    .listings
+                    .get(&(owner, _bundle_id.clone())),
+                None
+            );
+            assert_eq!(bundle_marketplace.owners.get(&_bundle_id), Some(caller));
+            assert_eq!(
+                bundle_marketplace.offers.get(&(_bundle_id.clone(), caller)),
+                None
+            );
+            let unit_price = 1;
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 2);
+            assert_item_sold_event(
+                &emitted_events[0],
+                owner,
+                caller,
+                bundle_id.clone(),
+                pay_token,
+                unit_price,
+                price,
+            );
+            assert_offer_canceled_event(&emitted_events[1], caller, bundle_id);
+        }
+
+        #[ink::test]
+        fn create_offer_works() {
+            // Create a new contract instance.
+            let mut bundle_marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let bundle_id = String::from("1");
+
+            let pay_token = alice();
+            let price = 1;
+            let deadline = bundle_marketplace.get_now() + 1;
+            let owner = bob();
+            let _bundle_id = bundle_marketplace.get_bundle_id(&bundle_id);
+            bundle_marketplace.owners.insert(&_bundle_id, &owner);
+            // assert_eq!( bundle_marketplace.create_offer(
+            //               bundle_id.clone(),
+            //         pay_token,
+            //         price,
+            //         deadline
+            // ).unwrap_err(),Error::NotOwningItem);
+            assert!(bundle_marketplace
+                .create_offer(bundle_id.clone(), pay_token, price, deadline)
+                .is_ok());
+            assert_eq!(
+                bundle_marketplace.offers.get(&(_bundle_id, caller)),
+                Some(Offer {
+                    pay_token,
+                    price,
+                    deadline,
+                }),
+            );
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_offer_created_event(
+                &emitted_events[0],
+                caller,
+                bundle_id,
+                pay_token,
+                price,
+                deadline,
+            );
+        }
+
+        #[ink::test]
+        fn cancel_offer_works() {
+            // Create a new contract instance.
+            let mut bundle_marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let bundle_id = String::from("1");
+            let pay_token = alice();
+            let price = 1;
+            let deadline = bundle_marketplace.get_now() + 1;
+            let _bundle_id = bundle_marketplace.get_bundle_id(&bundle_id);
+
+            bundle_marketplace.offers.insert(
+                &(_bundle_id.clone(), caller),
+                &Offer {
+                    pay_token,
+                    price,
+                    deadline,
+                },
+            );
+
+            // assert_eq!( bundle_marketplace.cancel_offer(
+            // nft_address, token_id
+            // ).unwrap_err(),Error::NotOwningItem);
+            assert!(bundle_marketplace.cancel_offer(bundle_id.clone()).is_ok());
+            assert_eq!(bundle_marketplace.offers.get(&(_bundle_id, caller)), None,);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_offer_canceled_event(&emitted_events[0], caller, bundle_id);
+        }
+
+        #[ink::test]
+        fn accept_offer_works() {
+            // Create a new contract instance.
+            let mut bundle_marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let deadline = bundle_marketplace.get_now() + 1;
+            let creator = bob();
+            let unit_price = 1;
+            let bundle_id = String::from("1");
+            let nft_addresses = vec![alice()];
+            let token_ids = vec![1];
+            let quantities = vec![1];
+            let pay_token = alice();
+            let price = 10;
+            let starting_time = bundle_marketplace.get_now();
+            let owner = caller;
+            let _bundle_id = bundle_marketplace.get_bundle_id(&bundle_id);
+            bundle_marketplace.listings.insert(
+                &(owner, _bundle_id.clone()),
+                &Listing {
+                    nft_addresses: nft_addresses.clone(),
+                    token_ids: token_ids.clone(),
+                    quantities: quantities.clone(),
+                    pay_token,
+                    price,
+                    starting_time,
+                },
+            );
+            bundle_marketplace.owners.insert(&_bundle_id, &owner);
+            bundle_marketplace.offers.insert(
+                &(_bundle_id.clone(), creator),
+                &Offer {
+                    pay_token,
+                    price,
+                    deadline,
+                },
+            );
+            //     assert_eq!( bundle_marketplace.accept_offer(
+            //    bundle_id.clone(), creator
+            //     ).unwrap_err(),Error::NotOwningItem);
+            assert!(bundle_marketplace
+                .accept_offer(bundle_id.clone(), creator)
+                .is_ok());
+            assert_eq!(
+                bundle_marketplace
+                    .listings
+                    .get(&(caller, _bundle_id.clone())),
+                None,
+            );
+            assert_eq!(
+                bundle_marketplace
+                    .listings
+                    .get(&(caller, _bundle_id.clone())),
+                None
+            );
+            assert_eq!(
+                bundle_marketplace
+                    .listings
+                    .get(&(creator, _bundle_id.clone())),
+                Some(Listing {
+                    nft_addresses,
+                    token_ids,
+                    quantities,
+                    pay_token,
+                    price: 0,
+                    starting_time,
+                })
+            );
+            assert_eq!(
+                bundle_marketplace
+                    .offers
+                    .get(&(_bundle_id.clone(), creator)),
+                None
+            );
+            assert_eq!(bundle_marketplace.owners.get(&_bundle_id), Some(creator));
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 2);
+            assert_item_sold_event(
+                &emitted_events[0],
+                caller,
+                creator,
+                bundle_id.clone(),
+                pay_token,
+                unit_price,
+                price,
+            );
+            assert_offer_canceled_event(&emitted_events[1], creator, bundle_id);
+        }
+
+        #[ink::test]
+        fn update_platform_fee_works() {
+            // Create a new contract instance.
+            let mut bundle_marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let platform_fee = 10;
+            assert!(bundle_marketplace.update_platform_fee(platform_fee).is_ok());
+
+            assert_eq!(bundle_marketplace.platform_fee, platform_fee);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_update_platform_fee_event(&emitted_events[0], platform_fee);
+        }
+
+        #[ink::test]
+        fn update_platform_fee_recipient_works() {
+            // Create a new contract instance.
+            let mut bundle_marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let fee_recipient = bob();
+            assert!(bundle_marketplace
+                .update_platform_fee_recipient(fee_recipient)
+                .is_ok());
+
+            assert_eq!(bundle_marketplace.fee_recipient, fee_recipient);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_update_platform_fee_recipient_event(&emitted_events[0], fee_recipient);
+        }
+
+        #[ink::test]
+        fn update_address_registry_works() {
+            // Create a new contract instance.
+            let mut bundle_marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let address_registry = bob();
+            assert!(bundle_marketplace
+                .update_address_registry(address_registry)
+                .is_ok());
+
+            assert_eq!(bundle_marketplace.address_registry, address_registry);
+        }
+
+        #[ink::test]
+        fn validate_item_sold_works() {
+            // Create a new contract instance.
+            let mut bundle_marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let nft_address = alice();
+            let token_id = 1;
+            let quantity = 300;
+            let pay_token = alice();
+            let price = 1;
+            let starting_time = bundle_marketplace.get_now();
+            let owner = caller;
+            let bundle_id = String::from("1");
+            let nft_addresses = vec![alice()];
+            let token_ids = vec![1];
+            let quantities = vec![quantity];
+            let _bundle_id = bundle_marketplace.get_bundle_id(&bundle_id);
+
+            let mut items = bundle_marketplace
+                .bundle_ids_per_item
+                .get(&(nft_address, token_id))
+                .unwrap_or_default();
+            items.insert(_bundle_id.clone());
+            bundle_marketplace
+                .bundle_ids_per_item
+                .insert(&(nft_address, token_id), &items);
+
+            bundle_marketplace.owners.insert(&_bundle_id, &owner);
+            bundle_marketplace.listings.insert(
+                &(owner, _bundle_id.clone()),
+                &Listing {
+                    nft_addresses: nft_addresses.clone(),
+                    token_ids: token_ids.clone(),
+                    quantities: quantities.clone(),
+                    pay_token,
+                    price,
+                    starting_time,
+                },
+            );
+            bundle_marketplace
+                .bundle_ids
+                .insert(&_bundle_id, &bundle_id);
+
+            bundle_marketplace
+                .nft_indices
+                .insert(&(_bundle_id.clone(), nft_address, token_id), &0);
+
+            // assert_eq!( bundle_marketplace.validate_item_sold(
+            // nft_address, token_id
+            // ).unwrap_err(),Error::NotOwningItem);
+            assert!(bundle_marketplace
+                .validate_item_sold(nft_address, token_id, quantity - 10)
+                .is_ok());
+            assert_eq!(
+                bundle_marketplace
+                    .listings
+                    .get(&(owner, _bundle_id.clone())),
+                Some(Listing {
+                    nft_addresses: nft_addresses.clone(),
+                    token_ids: token_ids.clone(),
+                    quantities: vec![10],
+                    pay_token,
+                    price,
+                    starting_time,
+                }),
+            );
+            assert_eq!(
+                bundle_marketplace
+                    .bundle_ids_per_item
+                    .get(&(nft_address, token_id)),
+                None,
+            );
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_item_updated_event(
+                &emitted_events[0],
+                caller,
+                bundle_id,
+                nft_addresses,
+                token_ids,
+                vec![10],
+                pay_token,
+                price,
+            );
+        }
+
+        #[ink::test]
+        fn get_listing_works() {
+            // Create a new contract instance.
+            let mut bundle_marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let bundle_id = String::from("1");
+            let nft_addresses = vec![frank()];
+            let token_ids = vec![1];
+            let quantities = vec![1];
+            let pay_token = django();
+            let price = 10;
+            let starting_time = 10;
+            let _bundle_id = bundle_marketplace.get_bundle_id(&bundle_id);
+            bundle_marketplace.listings.insert(
+                &(caller, _bundle_id.clone()),
+                &Listing {
+                    nft_addresses: nft_addresses.clone(),
+                    token_ids: token_ids.clone(),
+                    quantities: quantities.clone(),
+                    pay_token,
+                    price,
+                    starting_time,
+                },
+            );
+            // assert_eq!( bundle_marketplace.list_item(
+            //   nft_address,
+            //         token_id,
+            //         quantity,
+            //         pay_token,
+            //         price_per_item,
+            //         starting_time,
+            // ).unwrap_err(),Error::NotOwningItem);
+            assert_eq!(
+                bundle_marketplace.get_listing(caller, bundle_id),
+                (nft_addresses, token_ids, quantities, price, starting_time,)
+            );
+        }
+
         fn assert_item_listed_event(
             event: &ink_env::test::EmittedEvent,
             expected_owner: AccountId,
@@ -1392,11 +1966,11 @@ mod sub_bundle_marketplace {
             }
             let expected_topics = vec![
                 encoded_into_hash(&PrefixedValue {
-                    value: b"Contract::ItemListed",
+                    value: b"SubBundleMarketplace::ItemListed",
                     prefix: b"",
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::ItemListed::owner",
+                    prefix: b"SubBundleMarketplace::ItemListed::owner",
                     value: &expected_owner,
                 }),
             ];
@@ -1450,6 +2024,7 @@ mod sub_bundle_marketplace {
                     pay_token, expected_pay_token,
                     "encountered invalid ItemSold.pay_token"
                 );
+
                 assert_eq!(
                     unit_price, expected_unit_price,
                     "encountered invalid ItemSold.unit_price"
@@ -1461,15 +2036,15 @@ mod sub_bundle_marketplace {
             }
             let expected_topics = vec![
                 encoded_into_hash(&PrefixedValue {
-                    value: b"Contract::ItemSold",
+                    value: b"SubBundleMarketplace::ItemSold",
                     prefix: b"",
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::ItemSold::seller",
+                    prefix: b"SubBundleMarketplace::ItemSold::seller",
                     value: &expected_seller,
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::ItemSold::buyer",
+                    prefix: b"SubBundleMarketplace::ItemSold::buyer",
                     value: &expected_buyer,
                 }),
             ];
@@ -1517,6 +2092,10 @@ mod sub_bundle_marketplace {
                     "encountered invalid ItemUpdated.owner"
                 );
                 assert_eq!(
+                    bundle_id, expected_bundle_id,
+                    "encountered invalid ItemUpdated.bundle_id"
+                );
+                assert_eq!(
                     nft_addresses, expected_nft_addresses,
                     "encountered invalid ItemUpdated.nft_addresses"
                 );
@@ -1542,11 +2121,11 @@ mod sub_bundle_marketplace {
             }
             let expected_topics = vec![
                 encoded_into_hash(&PrefixedValue {
-                    value: b"Contract::ItemUpdated",
+                    value: b"SubBundleMarketplace::ItemUpdated",
                     prefix: b"",
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::ItemUpdated::owner",
+                    prefix: b"SubBundleMarketplace::ItemUpdated::owner",
                     value: &expected_owner,
                 }),
             ];
@@ -1588,11 +2167,11 @@ mod sub_bundle_marketplace {
             }
             let expected_topics = vec![
                 encoded_into_hash(&PrefixedValue {
-                    value: b"Contract::ItemCanceled",
+                    value: b"SubBundleMarketplace::ItemCanceled",
                     prefix: b"",
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::ItemCanceled::owner",
+                    prefix: b"SubBundleMarketplace::ItemCanceled::owner",
                     value: &expected_owner,
                 }),
             ];
@@ -1658,11 +2237,11 @@ mod sub_bundle_marketplace {
             }
             let expected_topics = vec![
                 encoded_into_hash(&PrefixedValue {
-                    value: b"Contract::OfferCreated",
+                    value: b"SubBundleMarketplace::OfferCreated",
                     prefix: b"",
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::OfferCreated::creator",
+                    prefix: b"SubBundleMarketplace::OfferCreated::creator",
                     value: &expected_creator,
                 }),
             ];
@@ -1704,11 +2283,11 @@ mod sub_bundle_marketplace {
             }
             let expected_topics = vec![
                 encoded_into_hash(&PrefixedValue {
-                    value: b"Contract::OfferCanceled",
+                    value: b"SubBundleMarketplace::OfferCanceled",
                     prefix: b"",
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::OfferCanceled::creator",
+                    prefix: b"SubBundleMarketplace::OfferCanceled::creator",
                     value: &expected_creator,
                 }),
             ];
@@ -1728,7 +2307,7 @@ mod sub_bundle_marketplace {
                 );
             }
         }
-        fn assert_platform_fee_event(
+        fn assert_update_platform_fee_event(
             event: &ink_env::test::EmittedEvent,
             expected_platform_fee: Balance,
         ) {
@@ -1744,7 +2323,7 @@ mod sub_bundle_marketplace {
             }
         }
 
-        fn assert_platform_fee_recipient_event(
+        fn assert_update_platform_fee_recipient_event(
             event: &ink_env::test::EmittedEvent,
             expected_fee_recipient: AccountId,
         ) {
