@@ -258,7 +258,7 @@ mod sub_marketplace {
             let listing = self
                 .listings
                 .get(&(nft_address, token_id, self.env().caller()))
-                .unwrap();
+                .unwrap_or_default();
             ensure!(listing.quantity == 0, Error::AlreadyListed);
 
             if self.supports_interface_check(nft_address, crate::INTERFACE_ID_ERC721) {
@@ -319,7 +319,7 @@ mod sub_marketplace {
             let listing = self
                 .listings
                 .get(&(nft_address, token_id, self.env().caller()))
-                .unwrap();
+                .unwrap_or_default();
             ensure!(listing.quantity > 0, Error::NotListedItem);
             self._cancel_listing(nft_address, token_id, self.env().caller())?;
             Ok(())
@@ -330,7 +330,10 @@ mod sub_marketplace {
             token_id: TokenId,
             owner: AccountId,
         ) -> Result<()> {
-            let listing = self.listings.get(&(nft_address, token_id, owner)).unwrap();
+            let listing = self
+                .listings
+                .get(&(nft_address, token_id, owner))
+                .unwrap_or_default();
             self.valid_owner(nft_address, token_id, owner, listing.quantity)?;
             self.listings.remove(&(nft_address, token_id, owner));
             self.env().emit_event(ItemCanceled {
@@ -357,12 +360,14 @@ mod sub_marketplace {
             let mut listing = self
                 .listings
                 .get(&(nft_address, token_id, self.env().caller()))
-                .unwrap();
+                .unwrap_or_default();
             ensure!(listing.quantity > 0, Error::NotListedItem);
             self.valid_owner(nft_address, token_id, self.env().caller(), listing.quantity)?;
             self.valid_pay_token(pay_token)?;
             listing.pay_token = pay_token;
             listing.price_per_item = new_price;
+            self.listings
+                .insert(&(nft_address, token_id, self.env().caller()), &listing);
             self.env().emit_event(ItemUpdated {
                 owner: self.env().caller(),
                 nft_address,
@@ -386,8 +391,8 @@ mod sub_marketplace {
         ) -> Result<()> {
             let listing = self
                 .listings
-                .get(&(nft_address, token_id, self.env().caller()))
-                .unwrap();
+                .get(&(nft_address, token_id, owner))
+                .unwrap_or_default();
             ensure!(listing.quantity > 0, Error::NotListedItem);
             self.valid_owner(nft_address, token_id, owner, listing.quantity)?;
 
@@ -408,7 +413,10 @@ mod sub_marketplace {
             pay_token: AccountId,
             owner: AccountId,
         ) -> Result<()> {
-            let listing = self.listings.get(&(nft_address, token_id, owner)).unwrap();
+            let listing = self
+                .listings
+                .get(&(nft_address, token_id, owner))
+                .unwrap_or_default();
             let price = listing.price_per_item * listing.quantity;
             let mut fee_amount = price * self.platform_fee / 1000;
             self.erc20_transfer_from(
@@ -417,14 +425,23 @@ mod sub_marketplace {
                 self.fee_recipient,
                 fee_amount,
             )?;
-            let minter = self.minters.get(&(nft_address, token_id)).unwrap();
-            let royalty = self.royalties.get(&(nft_address, token_id)).unwrap();
+            let minter = self
+                .minters
+                .get(&(nft_address, token_id))
+                .unwrap_or_default();
+            let royalty = self
+                .royalties
+                .get(&(nft_address, token_id))
+                .unwrap_or_default();
             if minter != AccountId::from([0x0; 32]) && royalty != 0 {
                 let royalty_fee = (price - fee_amount) * royalty / 10000;
                 self.erc20_transfer_from(pay_token, self.env().caller(), minter, royalty_fee)?;
                 fee_amount += royalty_fee;
             } else {
-                let collection_royalty = self.collection_royalties.get(nft_address).unwrap();
+                let collection_royalty = self
+                    .collection_royalties
+                    .get(nft_address)
+                    .unwrap_or_default();
                 let minter = collection_royalty.fee_recipient;
                 let royalty = collection_royalty.royalty;
                 if minter != AccountId::from([0x0; 32]) && royalty != 0 {
@@ -482,7 +499,7 @@ mod sub_marketplace {
             let offer = self
                 .offers
                 .get(&(nft_address, token_id, self.env().caller()))
-                .unwrap();
+                .unwrap_or_default();
             ensure!(
                 offer.quantity == 0 || offer.deadline <= self.get_now(),
                 Error::OfferAlreadyCreated
@@ -530,7 +547,7 @@ mod sub_marketplace {
             let offer = self
                 .offers
                 .get(&(nft_address, token_id, self.env().caller()))
-                .unwrap();
+                .unwrap_or_default();
             ensure!(
                 offer.quantity > 0 || offer.deadline > self.get_now(),
                 Error::OfferNotExistsOrExpired
@@ -556,7 +573,10 @@ mod sub_marketplace {
             token_id: TokenId,
             creator: AccountId,
         ) -> Result<()> {
-            let offer = self.offers.get(&(nft_address, token_id, creator)).unwrap();
+            let offer = self
+                .offers
+                .get(&(nft_address, token_id, creator))
+                .unwrap_or_default();
             ensure!(
                 offer.quantity > 0 || offer.deadline > self.get_now(),
                 Error::OfferNotExistsOrExpired
@@ -564,14 +584,23 @@ mod sub_marketplace {
             self.valid_owner(nft_address, token_id, self.env().caller(), offer.quantity)?;
             let price = offer.price_per_item * offer.quantity;
             let mut fee_amount = price * self.platform_fee / 1000;
-            let minter = self.minters.get(&(nft_address, token_id)).unwrap();
-            let royalty = self.royalties.get(&(nft_address, token_id)).unwrap();
+            let minter = self
+                .minters
+                .get(&(nft_address, token_id))
+                .unwrap_or_default();
+            let royalty = self
+                .royalties
+                .get(&(nft_address, token_id))
+                .unwrap_or_default();
             if minter != AccountId::from([0x0; 32]) && royalty != 0 {
                 let royalty_fee = (price - fee_amount) * royalty / 10000;
                 self.erc20_transfer_from(offer.pay_token, creator, minter, royalty_fee)?;
                 fee_amount += royalty_fee;
             } else {
-                let collection_royalty = self.collection_royalties.get(nft_address).unwrap();
+                let collection_royalty = self
+                    .collection_royalties
+                    .get(nft_address)
+                    .unwrap_or_default();
                 let minter = collection_royalty.fee_recipient;
                 let royalty = collection_royalty.royalty;
                 if minter != AccountId::from([0x0; 32]) && royalty != 0 {
@@ -683,7 +712,7 @@ mod sub_marketplace {
             #[cfg(test)]
             {
                 ink_env::debug_println!("ans:{:?}", 1);
-                false
+                true
             }
             #[cfg(not(test))]
             {
@@ -715,7 +744,7 @@ mod sub_marketplace {
             #[cfg(test)]
             {
                 ink_env::debug_println!("ans:{:?}", 1);
-                Ok(false)
+                Ok(true)
             }
             #[cfg(not(test))]
             {
@@ -742,7 +771,7 @@ mod sub_marketplace {
             #[cfg(test)]
             {
                 ink_env::debug_println!("ans:{:?}", 1);
-                Ok(Balance::default())
+                Ok(1)
             }
             #[cfg(not(test))]
             {
@@ -796,17 +825,23 @@ mod sub_marketplace {
         #[cfg_attr(test, allow(unused_variables))]
         fn valid_pay_token(&self, pay_token: AccountId) -> Result<()> {
             if AccountId::from([0x0; 32]) != pay_token {
-                let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
-                    ink_env::call::FromAccountId::from_account_id(self.address_registry);
-                ensure!(
-                    AccountId::from([0x0; 32]) != address_registry_instance.token_registry(),
-                    Error::InvalidPayToken
-                );
-                ensure!(
-                    self.token_registry_enabled(self.address_registry_token_registry()?, pay_token)
+                #[cfg(not(test))]
+                {
+                    let address_registry_instance: sub_address_registry::SubAddressRegistryRef =
+                        ink_env::call::FromAccountId::from_account_id(self.address_registry);
+                    ensure!(
+                        AccountId::from([0x0; 32]) != address_registry_instance.token_registry(),
+                        Error::InvalidPayToken
+                    );
+                    ensure!(
+                        self.token_registry_enabled(
+                            self.address_registry_token_registry()?,
+                            pay_token
+                        )
                         .is_ok(),
-                    Error::InvalidPayToken,
-                );
+                        Error::InvalidPayToken,
+                    );
+                }
             }
             Ok(())
         }
@@ -815,7 +850,7 @@ mod sub_marketplace {
             #[cfg(test)]
             {
                 ink_env::debug_println!("ans:{:?}", 1);
-                Ok(AccountId::default())
+                Ok(AccountId::from([0x1; 32]))
             }
             #[cfg(not(test))]
             {
@@ -833,7 +868,7 @@ mod sub_marketplace {
             #[cfg(test)]
             {
                 ink_env::debug_println!("ans:{:?}", 1);
-                Ok(false)
+                Ok(true)
             }
             #[cfg(not(test))]
             {
@@ -859,7 +894,7 @@ mod sub_marketplace {
             #[cfg(test)]
             {
                 ink_env::debug_println!("ans:{:?}", 1);
-                false
+                true
             }
             #[cfg(not(test))]
             {
@@ -950,7 +985,7 @@ mod sub_marketplace {
             let listing = self
                 .listings
                 .get(&(nft_address, token_id, self.env().caller()))
-                .unwrap();
+                .unwrap_or_default();
             if listing.quantity > 0 {
                 self._cancel_listing(nft_address, token_id, seller)?;
             }
@@ -1139,7 +1174,7 @@ mod sub_marketplace {
             #[cfg(test)]
             {
                 ink_env::debug_println!("ans:{:?}", 1);
-                Ok(false)
+                Ok(true)
             }
             #[cfg(not(test))]
             {
@@ -1173,7 +1208,7 @@ mod sub_marketplace {
             #[cfg(test)]
             {
                 ink_env::debug_println!("ans:{:?}", 1);
-                Ok(Some(AccountId::default()))
+                Ok(Some(AccountId::from([0x1; 32])))
             }
             #[cfg(not(test))]
             {
@@ -1204,7 +1239,7 @@ mod sub_marketplace {
             #[cfg(test)]
             {
                 ink_env::debug_println!("ans:{:?}", 1);
-                Ok(false)
+                Ok(true)
             }
             #[cfg(not(test))]
             {
@@ -1234,7 +1269,7 @@ mod sub_marketplace {
             #[cfg(test)]
             {
                 ink_env::debug_println!("ans:{:?}", 1);
-                Ok(Balance::default())
+                Ok(1)
             }
             #[cfg(not(test))]
             {
@@ -1354,8 +1389,8 @@ mod sub_marketplace {
     mod tests {
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
-        // use ink_lang as ink;
         use ink_env::Clear;
+        use ink_lang as ink;
         type Event = <SubMarketplace as ::ink_lang::reflect::ContractEventBase>::Type;
 
         fn set_caller(sender: AccountId) {
@@ -1382,6 +1417,448 @@ mod sub_marketplace {
 
             erc
         }
+        #[ink::test]
+        fn list_item_works() {
+            // Create a new contract instance.
+            let mut marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let nft_address = alice();
+            let token_id = 1;
+            let quantity = 300;
+            let pay_token = alice();
+            let price_per_item = 10;
+            let starting_time = 10;
+            // assert_eq!( marketplace.list_item(
+            //   nft_address,
+            //         token_id,
+            //         quantity,
+            //         pay_token,
+            //         price_per_item,
+            //         starting_time,
+            // ).unwrap_err(),Error::NotOwningItem);
+            assert!(marketplace
+                .list_item(
+                    nft_address,
+                    token_id,
+                    quantity,
+                    pay_token,
+                    price_per_item,
+                    starting_time,
+                )
+                .is_ok());
+
+            assert_eq!(
+                marketplace.listings.get(&(nft_address, token_id, caller)),
+                Some(Listing {
+                    quantity,
+                    pay_token,
+                    price_per_item,
+                    starting_time,
+                })
+            );
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_item_listed_event(
+                &emitted_events[0],
+                caller,
+                nft_address,
+                token_id,
+                quantity,
+                pay_token,
+                price_per_item,
+                starting_time,
+            );
+        }
+
+        #[ink::test]
+        fn cancel_listing_works() {
+            // Create a new contract instance.
+            let mut marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let nft_address = alice();
+            let token_id = 1;
+            let quantity = 300;
+            let pay_token = alice();
+            let price_per_item = 10;
+            let starting_time = 10;
+            marketplace.listings.insert(
+                &(nft_address, token_id, caller),
+                &Listing {
+                    quantity,
+                    pay_token,
+                    price_per_item,
+                    starting_time,
+                },
+            );
+            // assert_eq!( marketplace.cancel_listing(
+            //   nft_address,
+            //         token_id,
+            // ).unwrap_err(),Error::NotOwningItem);
+            assert!(marketplace.cancel_listing(nft_address, token_id,).is_ok());
+
+            assert_eq!(
+                marketplace.listings.get(&(nft_address, token_id, caller)),
+                None
+            );
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_item_canceled_event(&emitted_events[0], caller, nft_address, token_id);
+        }
+
+        #[ink::test]
+        fn update_listing_works() {
+            // Create a new contract instance.
+            let mut marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let nft_address = alice();
+            let token_id = 1;
+            let quantity = 300;
+            let pay_token = alice();
+            let price_per_item = 10;
+            let starting_time = 10;
+            let new_price = 11;
+            let new_pay_token = bob();
+            marketplace.listings.insert(
+                &(nft_address, token_id, caller),
+                &Listing {
+                    quantity,
+                    pay_token,
+                    price_per_item,
+                    starting_time,
+                },
+            );
+
+            // assert_eq!( marketplace.update_listing(
+            //   nft_address,
+            //         token_id,
+            // ).unwrap_err(),Error::NotOwningItem);
+            assert!(marketplace
+                .update_listing(nft_address, token_id, new_pay_token, new_price)
+                .is_ok());
+
+            assert_eq!(
+                marketplace.listings.get(&(nft_address, token_id, caller)),
+                Some(Listing {
+                    quantity,
+                    pay_token: new_pay_token,
+                    price_per_item: new_price,
+                    starting_time,
+                })
+            );
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_item_updated_event(
+                &emitted_events[0],
+                caller,
+                nft_address,
+                token_id,
+                new_pay_token,
+                new_price,
+            );
+        }
+
+        #[ink::test]
+        fn buy_item_works() {
+            // Create a new contract instance.
+            let mut marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let nft_address = alice();
+            let token_id = 1;
+            let quantity = 300;
+            let pay_token = alice();
+            let price_per_item = 1;
+            let starting_time = marketplace.get_now();
+            let owner = bob();
+            let unit_price = 1;
+            marketplace.listings.insert(
+                &(nft_address, token_id, owner),
+                &Listing {
+                    quantity,
+                    pay_token,
+                    price_per_item,
+                    starting_time,
+                },
+            );
+
+            // assert_eq!( marketplace.buy_item(
+            //   nft_address,
+            //         token_id, pay_token, owner
+            // ).unwrap_err(),Error::NotOwningItem);
+            assert!(marketplace
+                .buy_item(nft_address, token_id, pay_token, owner)
+                .is_ok());
+
+            assert_eq!(
+                marketplace.listings.get(&(nft_address, token_id, owner)),
+                None
+            );
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_item_sold_event(
+                &emitted_events[0],
+                owner,
+                caller,
+                nft_address,
+                token_id,
+                quantity,
+                pay_token,
+                unit_price,
+                price_per_item,
+            );
+        }
+
+        #[ink::test]
+        fn create_offer_works() {
+            // Create a new contract instance.
+            let mut marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let nft_address = alice();
+            let token_id = 1;
+            let quantity = 300;
+            let pay_token = alice();
+            let price_per_item = 1;
+            let deadline = marketplace.get_now() + 1;
+            let owner = bob();
+            let unit_price = 1;
+            // assert_eq!( marketplace.create_offer(
+            // nft_address, token_id, pay_token, quantity,price_per_item,deadline
+            // ).unwrap_err(),Error::NotOwningItem);
+            assert!(marketplace
+                .create_offer(
+                    nft_address,
+                    token_id,
+                    pay_token,
+                    quantity,
+                    price_per_item,
+                    deadline
+                )
+                .is_ok());
+            assert_eq!(
+                marketplace.offers.get(&(nft_address, token_id, caller)),
+                Some(Offer {
+                    quantity,
+                    pay_token,
+                    price_per_item,
+                    deadline,
+                }),
+            );
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_offer_created_event(
+                &emitted_events[0],
+                caller,
+                nft_address,
+                token_id,
+                quantity,
+                pay_token,
+                price_per_item,
+                deadline,
+            );
+        }
+
+        #[ink::test]
+        fn cancel_offer_works() {
+            // Create a new contract instance.
+            let mut marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let nft_address = alice();
+            let token_id = 1;
+            let quantity = 300;
+            let pay_token = alice();
+            let price_per_item = 1;
+            let deadline = marketplace.get_now() + 1;
+            let owner = bob();
+            let unit_price = 1;
+            marketplace.offers.insert(
+                &(nft_address, token_id, caller),
+                &Offer {
+                    quantity,
+                    pay_token,
+                    price_per_item,
+                    deadline,
+                },
+            );
+            // assert_eq!( marketplace.cancel_offer(
+            // nft_address, token_id
+            // ).unwrap_err(),Error::NotOwningItem);
+            assert!(marketplace.cancel_offer(nft_address, token_id).is_ok());
+            assert_eq!(
+                marketplace.offers.get(&(nft_address, token_id, caller)),
+                None,
+            );
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_offer_canceled_event(&emitted_events[0], caller, nft_address, token_id);
+        }
+
+        #[ink::test]
+        fn accept_offer_works() {
+            // Create a new contract instance.
+            let mut marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let nft_address = alice();
+            let token_id = 1;
+            let quantity = 300;
+            let pay_token = alice();
+            let price_per_item = 1;
+            let deadline = marketplace.get_now() + 1;
+            let starting_time = marketplace.get_now();
+            let creator = bob();
+            let unit_price = 1;
+            marketplace.listings.insert(
+                &(nft_address, token_id, caller),
+                &Listing {
+                    quantity,
+                    pay_token,
+                    price_per_item,
+                    starting_time,
+                },
+            );
+            marketplace.offers.insert(
+                &(nft_address, token_id, creator),
+                &Offer {
+                    quantity,
+                    pay_token,
+                    price_per_item,
+                    deadline,
+                },
+            );
+            // assert_eq!( marketplace.accept_offer(
+            // nft_address, token_id
+            // ).unwrap_err(),Error::NotOwningItem);
+            assert!(marketplace
+                .accept_offer(nft_address, token_id, creator)
+                .is_ok());
+            assert_eq!(
+                marketplace.listings.get(&(nft_address, token_id, caller)),
+                None,
+            );
+            assert_eq!(
+                marketplace.offers.get(&(nft_address, token_id, creator)),
+                None,
+            );
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 2);
+            assert_item_sold_event(
+                &emitted_events[0],
+                caller,
+                creator,
+                nft_address,
+                token_id,
+                quantity,
+                pay_token,
+                unit_price,
+                price_per_item,
+            );
+            assert_offer_canceled_event(&emitted_events[1], creator, nft_address, token_id);
+        }
+
+        #[ink::test]
+        fn register_royalty_works() {
+            // Create a new contract instance.
+            let mut marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let nft_address = alice();
+            let token_id = 1;
+            let royalty = 1;
+
+            // assert_eq!( marketplace.accept_offer(
+            // nft_address, token_id
+            // ).unwrap_err(),Error::NotOwningItem);
+            assert!(marketplace
+                .register_royalty(nft_address, token_id, royalty)
+                .is_ok());
+            assert_eq!(
+                marketplace.minters.get(&(nft_address, token_id)),
+                Some(caller),
+            );
+            assert_eq!(
+                marketplace.royalties.get(&(nft_address, token_id)),
+                Some(royalty),
+            );
+        }
+
+        #[ink::test]
+        fn register_collection_royalty_works() {
+            // Create a new contract instance.
+            let mut marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let nft_address = alice();
+            let creator = bob();
+            let fee_recipient = charlie();
+            let royalty = 1;
+
+            // assert_eq!( marketplace.accept_offer(
+            // nft_address, token_id
+            // ).unwrap_err(),Error::NotOwningItem);
+            assert!(marketplace
+                .register_collection_royalty(nft_address, creator, royalty, fee_recipient)
+                .is_ok());
+            assert_eq!(
+                marketplace.collection_royalties.get(&nft_address),
+                Some(CollectionRoyalty {
+                    royalty,
+                    creator,
+                    fee_recipient,
+                }),
+            );
+        }
+
+        #[ink::test]
+        fn update_platform_fee_works() {
+            // Create a new contract instance.
+            let mut marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let platform_fee = 10;
+            assert!(marketplace.update_platform_fee(platform_fee).is_ok());
+
+            assert_eq!(marketplace.platform_fee, platform_fee);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_update_platform_fee_event(&emitted_events[0], platform_fee);
+        }
+
+        #[ink::test]
+        fn update_platform_fee_recipient_works() {
+            // Create a new contract instance.
+            let mut marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let fee_recipient = bob();
+            assert!(marketplace
+                .update_platform_fee_recipient(fee_recipient)
+                .is_ok());
+
+            assert_eq!(marketplace.fee_recipient, fee_recipient);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_update_platform_fee_recipient_event(&emitted_events[0], fee_recipient);
+        }
+
+        #[ink::test]
+        fn update_address_registry_works() {
+            // Create a new contract instance.
+            let mut marketplace = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let address_registry = bob();
+            assert!(marketplace
+                .update_address_registry(address_registry)
+                .is_ok());
+
+            assert_eq!(marketplace.address_registry, address_registry);
+        }
+
         fn assert_item_listed_event(
             event: &ink_env::test::EmittedEvent,
             expected_owner: AccountId,
@@ -1438,15 +1915,15 @@ mod sub_marketplace {
             }
             let expected_topics = vec![
                 encoded_into_hash(&PrefixedValue {
-                    value: b"Contract::ItemListed",
+                    value: b"SubMarketplace::ItemListed",
                     prefix: b"",
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::ItemListed::owner",
+                    prefix: b"SubMarketplace::ItemListed::owner",
                     value: &expected_owner,
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::ItemListed::nft_address",
+                    prefix: b"SubMarketplace::ItemListed::nft_address",
                     value: &expected_nft_address,
                 }),
             ];
@@ -1526,19 +2003,19 @@ mod sub_marketplace {
             }
             let expected_topics = vec![
                 encoded_into_hash(&PrefixedValue {
-                    value: b"Contract::ItemSold",
+                    value: b"SubMarketplace::ItemSold",
                     prefix: b"",
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::ItemSold::seller",
+                    prefix: b"SubMarketplace::ItemSold::seller",
                     value: &expected_seller,
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::ItemSold::buyer",
+                    prefix: b"SubMarketplace::ItemSold::buyer",
                     value: &expected_buyer,
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::ItemSold::nft_address",
+                    prefix: b"SubMarketplace::ItemSold::nft_address",
                     value: &expected_nft_address,
                 }),
             ];
@@ -1603,15 +2080,15 @@ mod sub_marketplace {
             }
             let expected_topics = vec![
                 encoded_into_hash(&PrefixedValue {
-                    value: b"Contract::ItemUpdated",
+                    value: b"SubMarketplace::ItemUpdated",
                     prefix: b"",
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::ItemUpdated::owner",
+                    prefix: b"SubMarketplace::ItemUpdated::owner",
                     value: &expected_owner,
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::ItemUpdated::nft_address",
+                    prefix: b"SubMarketplace::ItemUpdated::nft_address",
                     value: &expected_nft_address,
                 }),
             ];
@@ -1663,15 +2140,15 @@ mod sub_marketplace {
             }
             let expected_topics = vec![
                 encoded_into_hash(&PrefixedValue {
-                    value: b"Contract::ItemCanceled",
+                    value: b"SubMarketplace::ItemCanceled",
                     prefix: b"",
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::ItemCanceled::owner",
+                    prefix: b"SubMarketplace::ItemCanceled::owner",
                     value: &expected_owner,
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::ItemCanceled::nft_address",
+                    prefix: b"SubMarketplace::ItemCanceled::nft_address",
                     value: &expected_nft_address,
                 }),
             ];
@@ -1748,15 +2225,15 @@ mod sub_marketplace {
             }
             let expected_topics = vec![
                 encoded_into_hash(&PrefixedValue {
-                    value: b"Contract::OfferCreated",
+                    value: b"SubMarketplace::OfferCreated",
                     prefix: b"",
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::OfferCreated::creator",
+                    prefix: b"SubMarketplace::OfferCreated::creator",
                     value: &expected_creator,
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::OfferCreated::nft_address",
+                    prefix: b"SubMarketplace::OfferCreated::nft_address",
                     value: &expected_nft_address,
                 }),
             ];
@@ -1808,15 +2285,15 @@ mod sub_marketplace {
             }
             let expected_topics = vec![
                 encoded_into_hash(&PrefixedValue {
-                    value: b"Contract::OfferCanceled",
+                    value: b"SubMarketplace::OfferCanceled",
                     prefix: b"",
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::OfferCanceled::creator",
+                    prefix: b"SubMarketplace::OfferCanceled::creator",
                     value: &expected_creator,
                 }),
                 encoded_into_hash(&PrefixedValue {
-                    prefix: b"Contract::OfferCanceled::nft_address",
+                    prefix: b"SubMarketplace::OfferCanceled::nft_address",
                     value: &expected_nft_address,
                 }),
             ];
@@ -1836,7 +2313,7 @@ mod sub_marketplace {
                 );
             }
         }
-        fn assert_platform_fee_event(
+        fn assert_update_platform_fee_event(
             event: &ink_env::test::EmittedEvent,
             expected_platform_fee: Balance,
         ) {
@@ -1852,7 +2329,7 @@ mod sub_marketplace {
             }
         }
 
-        fn assert_platform_fee_recipient_event(
+        fn assert_update_platform_fee_recipient_event(
             event: &ink_env::test::EmittedEvent,
             expected_fee_recipient: AccountId,
         ) {
