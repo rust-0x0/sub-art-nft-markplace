@@ -94,7 +94,9 @@ mod sub_artion {
         /// Mapping from owner to operator approvals.
         operator_approvals: Mapping<(AccountId, AccountId), ()>,
         ///  current max tokenId
-        token_id_pointer: TokenId,
+        token_id_nonce: TokenId,
+        /// Mapping from token to creator.
+        token_creator: Mapping<TokenId, AccountId>,
         ///  TokenID -> Uri
         token_uris: Mapping<TokenId, String>,
         /// # note Platform fee
@@ -195,7 +197,7 @@ mod sub_artion {
         }
         /// Creates a new token.
         #[ink(message, payable)]
-        pub fn mint_with_owner_and_uri(
+        pub fn mint_artion(
             &mut self,
             beneficiary: AccountId,
             token_uri: String,
@@ -207,12 +209,11 @@ mod sub_artion {
             let minter = self.env().caller();
 
             self._assert_minting_params_valid(&token_uri, minter)?;
-            self.token_id_pointer += 1;
-            let token_id = self.token_id_pointer;
+            self.token_id_nonce += 1;
+            let token_id = self.token_id_nonce;
             let caller = beneficiary;
             // Mint token and set token URI
             self.add_token_to(&caller, token_id)?;
-            // _setTokenURI(tokenId, token_uri);  //TODO
             self.set_token_uri(token_id, &token_uri)?;
             // Send NativeToken fee to fee recipient
             ensure!(
@@ -221,6 +222,7 @@ mod sub_artion {
                     .is_ok(),
                 Error::InsufficientFundsToMint
             );
+            self.token_creator.insert(&token_id, &minter);
             self.env().emit_event(Minted {
                 token_id,
                 beneficiary,
@@ -232,7 +234,7 @@ mod sub_artion {
 
         /// Deletes an existing token. Only the owner can burn the token.
         #[ink(message)]
-        pub fn burn_art(&mut self, token_id: TokenId) -> Result<()> {
+        pub fn burn_artion(&mut self, token_id: TokenId) -> Result<()> {
             let caller = self.env().caller();
             ensure!(
                 self.owner_of(token_id) == Some(caller) || self.is_approved(token_id, caller),
@@ -240,7 +242,7 @@ mod sub_artion {
             );
 
             self.burn(token_id)?;
-
+            self.token_creator.remove(&token_id);
             Ok(())
         }
 
@@ -584,11 +586,130 @@ mod sub_artion {
         fn charlie() -> AccountId {
             default_accounts().charlie
         }
+        fn set_balance(account_id: AccountId, balance: Balance) {
+            ink_env::test::set_account_balance::<ink_env::DefaultEnvironment>(account_id, balance)
+        }
+        fn get_balance(account_id: AccountId) -> Balance {
+            ink_env::test::get_account_balance::<ink_env::DefaultEnvironment>(account_id)
+                .expect("Cannot get account balance")
+        }
 
+        fn django() -> AccountId {
+            default_accounts().django
+        }
+
+        fn eve() -> AccountId {
+            default_accounts().eve
+        }
+
+        fn frank() -> AccountId {
+            default_accounts().frank
+        }
+        fn fee_recipient() -> AccountId {
+            default_accounts().django
+        }
         fn init_contract() -> SubArtion {
-            let mut erc = SubArtion::new(0, bob());
+            let erc = SubArtion::new(1, fee_recipient());
 
             erc
+        }
+
+        #[ink::test]
+        fn mint_artion_works() {
+            // Create a new contract instance.
+            let mut artion = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let beneficiary = bob();
+            let token_uri = String::from("token_uri:bob");
+            set_balance(caller, 10);
+            set_balance(fee_recipient(), 0);
+            ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(1);
+
+            let token_id_result = artion.mint_artion(beneficiary, token_uri.clone());
+            assert!(token_id_result.is_ok());
+            assert_eq!(get_balance(fee_recipient()), 1);
+
+            assert_eq!(artion.owned_tokens_count.get(beneficiary), Some(1));
+            assert_eq!(
+                artion.token_owner.get(&token_id_result.unwrap()),
+                Some(beneficiary)
+            );
+            assert_eq!(
+                artion.token_creator.get(&token_id_result.unwrap()),
+                Some(caller)
+            );
+            assert_eq!(
+                artion.token_uris.get(&token_id_result.unwrap()),
+                Some(token_uri.clone())
+            );
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_minted_event(
+                &emitted_events[0],
+                token_id_result.unwrap(),
+                beneficiary,
+                token_uri,
+                caller,
+            );
+        }
+
+        #[ink::test]
+        fn burn_artion_works() {
+            // Create a new contract instance.
+            let mut artion = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let beneficiary = caller;
+            let token_uri = String::from("token_uri:bob");
+            artion.token_id_nonce += 1;
+            let token_id = artion.token_id_nonce;
+            artion.owned_tokens_count.insert(beneficiary, &1);
+            artion.token_owner.insert(&token_id, &beneficiary);
+            artion.token_creator.insert(&token_id, &beneficiary);
+            assert!(artion.burn_artion(token_id).is_ok());
+
+            assert_eq!(artion.owned_tokens_count.get(beneficiary), Some(0));
+            assert_eq!(artion.token_owner.get(&token_id), None);
+            assert_eq!(artion.token_creator.get(&token_id), None);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_transfer_event(
+                &emitted_events[0],
+                Some(caller),
+                Some(AccountId::from([0x0; 32])),
+                token_id,
+            );
+        }
+
+        #[ink::test]
+        fn update_platform_fee_works() {
+            // Create a new contract instance.
+            let mut artion = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let platform_fee = 10;
+            assert!(artion.update_platform_fee(platform_fee).is_ok());
+
+            assert_eq!(artion.platform_fee, platform_fee);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_update_platform_fee_event(&emitted_events[0], platform_fee);
+        }
+
+        #[ink::test]
+        fn update_platform_fee_recipient_works() {
+            // Create a new contract instance.
+            let mut artion = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let fee_recipient = bob();
+            assert!(artion.update_platform_fee_recipient(fee_recipient).is_ok());
+
+            assert_eq!(artion.fee_recipient, fee_recipient);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_update_platform_fee_recipient_event(&emitted_events[0], fee_recipient);
         }
 
         fn assert_minted_event(
@@ -624,7 +745,7 @@ mod sub_artion {
                 panic!("encountered unexpected event kind: expected a Minted event")
             }
         }
-        fn assert_platform_fee_event(
+        fn assert_update_platform_fee_event(
             event: &ink_env::test::EmittedEvent,
             expected_platform_fee: Balance,
         ) {
@@ -640,7 +761,7 @@ mod sub_artion {
             }
         }
 
-        fn assert_platform_fee_recipient_event(
+        fn assert_update_platform_fee_recipient_event(
             event: &ink_env::test::EmittedEvent,
             expected_fee_recipient: AccountId,
         ) {
@@ -655,6 +776,59 @@ mod sub_artion {
                 );
             } else {
                 panic!("encountered unexpected event kind: expected a UpdatePlatformFeeRecipient event")
+            }
+        }
+
+        fn assert_transfer_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_from: Option<AccountId>,
+            expected_to: Option<AccountId>,
+            expected_token_id: TokenId,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::Transfer(Transfer { from, to, id }) = decoded_event {
+                assert_eq!(from, expected_from, "encountered invalid Transfer.from");
+                assert_eq!(to, expected_to, "encountered invalid Transfer.to");
+                assert_eq!(
+                    id, expected_token_id,
+                    "encountered invalid Transfer.token_id"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a Transfer event")
+            }
+            let expected_topics = vec![
+                encoded_into_hash(&PrefixedValue {
+                    value: b"SubArtion::Transfer",
+                    prefix: b"",
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubArtion::Transfer::from",
+                    value: &expected_from,
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubArtion::Transfer::to",
+                    value: &expected_to,
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubArtion::Transfer::id",
+                    value: &expected_token_id,
+                }),
+            ];
+
+            let topics = event.topics.clone();
+            for (n, (actual_topic, expected_topic)) in
+                topics.iter().zip(expected_topics).enumerate()
+            {
+                let mut topic_hash = Hash::clear();
+                let len = actual_topic.len();
+                topic_hash.as_mut()[0..len].copy_from_slice(&actual_topic[0..len]);
+
+                assert_eq!(
+                    topic_hash, expected_topic,
+                    "encountered invalid topic at {}",
+                    n
+                );
             }
         }
 

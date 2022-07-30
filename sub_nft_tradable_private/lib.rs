@@ -85,7 +85,7 @@ pub mod sub_nft_tradable_private {
         /// Mapping from owner to operator approvals.
         operator_approvals: Mapping<(AccountId, AccountId), ()>,
         ///  current max tokenId
-        current_token_id: TokenId,
+        token_id_nonce: TokenId,
         ///  TokenID -> Uri
         token_uris: Mapping<TokenId, String>,
         name: String,
@@ -126,7 +126,7 @@ pub mod sub_nft_tradable_private {
 
     // The SubNFTTradablePrivate result types.
     pub type Result<T> = core::result::Result<T, Error>;
-
+    ///=============Sub  Begin============
     #[ink(event)]
     pub struct ContractCreated {
         pub creator: AccountId,
@@ -137,7 +137,7 @@ pub mod sub_nft_tradable_private {
         pub caller: AccountId,
         pub nft_address: AccountId,
     }
-
+    ///=============Sub  End============
     /// Event emitted when a token transfer occurs.
     #[ink(event)]
     pub struct Transfer {
@@ -257,7 +257,7 @@ pub mod sub_nft_tradable_private {
          * @param _to address of the future owner of the token
          */
         #[ink(message, payable)]
-        pub fn mint_to_and_uri(&mut self, to: AccountId, token_uri: String) -> Result<TokenId> {
+        pub fn mint_nft(&mut self, to: AccountId, token_uri: String) -> Result<TokenId> {
             ensure!(self.env().caller() == self.owner, Error::OnlyOwner);
 
             ensure!(
@@ -319,13 +319,13 @@ pub mod sub_nft_tradable_private {
          * @return uint256 for the next token ID
          */
         fn get_next_token_id(&self) -> TokenId {
-            self.current_token_id + 1
+            self.token_id_nonce + 1
         }
         /**
          * @dev increments the value of _currentTokenID
          */
         fn increment_token_type_id(&mut self) {
-            self.current_token_id += 1;
+            self.token_id_nonce += 1;
         }
         ///checks the given token ID is approved either for all or the single token ID
         fn is_approved(&self, token_id: TokenId, operator: AccountId) -> bool {
@@ -680,93 +680,163 @@ pub mod sub_nft_tradable_private {
         fn charlie() -> AccountId {
             default_accounts().charlie
         }
+        fn set_balance(account_id: AccountId, balance: Balance) {
+            ink_env::test::set_account_balance::<ink_env::DefaultEnvironment>(account_id, balance)
+        }
+        fn get_balance(account_id: AccountId) -> Balance {
+            ink_env::test::get_account_balance::<ink_env::DefaultEnvironment>(account_id)
+                .expect("Cannot get account balance")
+        }
 
+        fn django() -> AccountId {
+            default_accounts().django
+        }
+
+        fn eve() -> AccountId {
+            default_accounts().eve
+        }
+
+        fn frank() -> AccountId {
+            default_accounts().frank
+        }
+        fn fee_recipient() -> AccountId {
+            django()
+        }
         fn init_contract() -> SubNFTTradablePrivate {
-            let mut erc = SubNFTTradablePrivate::new(
+            let erc = SubNFTTradablePrivate::new(
                 String::from("test"),
                 String::from("TEST"),
-                alice(),
-                alice(),
-                bob(),
-                0,
                 charlie(),
+                eve(),
+                frank(),
+                1,
+                fee_recipient(),
             );
 
             erc
         }
-        // fn assert_transfer_batch_event(
-        //     event: &ink_env::test::EmittedEvent,
-        //     expected_operator: Option<AccountId>,
-        //     expected_from: Option<AccountId>,
-        //     expected_to: Option<AccountId>,
-        //     expected_token_ids: Vec<TokenId>,
-        //     expected_values: Vec<Balance>,
-        // ) {
-        //     let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
-        //         .expect("encountered invalid contract event data buffer");
-        //     if let Event::TransferBatch(TransferBatch {
-        //         operator,
-        //         from,
-        //         to,
-        //         token_ids,
-        //         values,
-        //     }) = decoded_event
-        //     {
-        //         assert_eq!(
-        //             operator, expected_operator,
-        //             "encountered invalid TransferBatch.operator"
-        //         );
-        //         assert_eq!(
-        //             from, expected_from,
-        //             "encountered invalid TransferBatch.from"
-        //         );
-        //         assert_eq!(to, expected_to, "encountered invalid TransferBatch.to");
-        //         assert_eq!(
-        //             token_ids, expected_token_ids,
-        //             "encountered invalid TransferBatch.token_ids"
-        //         );
-        //         assert_eq!(
-        //             values, expected_values,
-        //             "encountered invalid TransferBatch.values"
-        //         );
-        //     } else {
-        //         panic!("encountered unexpected event kind: expected a TransferBatch event")
-        //     }
-        //     let expected_topics = vec![
-        //         encoded_into_hash(&PrefixedValue {
-        //             value: b"Contract::TransferBatch",
-        //             prefix: b"",
-        //         }),
-        //         encoded_into_hash(&PrefixedValue {
-        //             prefix: b"Contract::TransferBatch::operator",
-        //             value: &expected_operator,
-        //         }),
-        //         encoded_into_hash(&PrefixedValue {
-        //             prefix: b"Contract::TransferBatch::from",
-        //             value: &expected_from,
-        //         }),
-        //         encoded_into_hash(&PrefixedValue {
-        //             prefix: b"Contract::TransferBatch::to",
-        //             value: &expected_to,
-        //         }),
-        //     ];
+        #[ink::test]
+        fn mint_nft_works() {
+            // Create a new contract instance.
+            let mut nft_tradable = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let beneficiary = bob();
+            let token_uri = String::from("token_uri:bob");
+            set_balance(caller, 10);
+            set_balance(fee_recipient(), 0);
+            ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(1);
 
-        //     let topics = event.topics.clone();
-        //     for (n, (actual_topic, expected_topic)) in
-        //         topics.iter().zip(expected_topics).enumerate()
-        //     {
-        //         let mut topic_hash = Hash::clear();
-        //         let len = actual_topic.len();
-        //         topic_hash.as_mut()[0..len].copy_from_slice(&actual_topic[0..len]);
+            let token_id_result = nft_tradable.mint_nft(beneficiary, token_uri.clone());
+            assert!(token_id_result.is_ok());
+            assert_eq!(get_balance(fee_recipient()), 1);
 
-        //         assert_eq!(
-        //             topic_hash, expected_topic,
-        //             "encountered invalid topic at {}",
-        //             n
-        //         );
-        //     }
-        // }
-        fn assert_platform_fee_event(
+            assert_eq!(nft_tradable.owned_tokens_count.get(beneficiary), Some(1));
+            assert_eq!(
+                nft_tradable.token_owner.get(&token_id_result.unwrap()),
+                Some(beneficiary)
+            );
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_minted_event(
+                &emitted_events[0],
+                token_id_result.unwrap(),
+                beneficiary,
+                token_uri,
+                caller,
+            );
+        }
+
+        #[ink::test]
+        fn burn_nft_works() {
+            // Create a new contract instance.
+            let mut nft_tradable = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let beneficiary = caller;
+            nft_tradable.token_id_nonce += 1;
+            let token_id = nft_tradable.token_id_nonce;
+            nft_tradable.owned_tokens_count.insert(beneficiary, &1);
+            nft_tradable.token_owner.insert(&token_id, &beneficiary);
+            assert!(nft_tradable.burn_nft(token_id).is_ok());
+
+            assert_eq!(nft_tradable.owned_tokens_count.get(beneficiary), Some(0));
+            assert_eq!(nft_tradable.token_owner.get(&token_id), None);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_transfer_event(
+                &emitted_events[0],
+                Some(caller),
+                Some(AccountId::from([0x0; 32])),
+                token_id,
+            );
+        }
+
+        #[ink::test]
+        fn update_platform_fee_works() {
+            // Create a new contract instance.
+            let mut nft_tradable = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let platform_fee = 10;
+            assert!(nft_tradable.update_platform_fee(platform_fee).is_ok());
+
+            assert_eq!(nft_tradable.platform_fee, platform_fee);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_update_platform_fee_event(&emitted_events[0], platform_fee);
+        }
+
+        #[ink::test]
+        fn update_platform_fee_recipient_works() {
+            // Create a new contract instance.
+            let mut nft_tradable = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let fee_recipient = bob();
+            assert!(nft_tradable
+                .update_platform_fee_recipient(fee_recipient)
+                .is_ok());
+
+            assert_eq!(nft_tradable.fee_recipient, fee_recipient);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_update_platform_fee_recipient_event(&emitted_events[0], fee_recipient);
+        }
+        fn assert_minted_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_token_id: TokenId,
+            expected_beneficiary: AccountId,
+            expected_token_uri: String,
+            expected_minter: AccountId,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::Minted(Minted {
+                token_id,
+                beneficiary,
+                token_uri,
+                minter,
+            }) = decoded_event
+            {
+                assert_eq!(
+                    token_id, expected_token_id,
+                    "encountered invalid Minted.token_id"
+                );
+                assert_eq!(
+                    beneficiary, expected_beneficiary,
+                    "encountered invalid Minted.beneficiary"
+                );
+                assert_eq!(
+                    token_uri, expected_token_uri,
+                    "encountered invalid Minted.token_uri"
+                );
+                assert_eq!(minter, expected_minter, "encountered invalid Minted.minter");
+            } else {
+                panic!("encountered unexpected event kind: expected a Minted event")
+            }
+        }
+        fn assert_update_platform_fee_event(
             event: &ink_env::test::EmittedEvent,
             expected_platform_fee: Balance,
         ) {
@@ -782,7 +852,7 @@ pub mod sub_nft_tradable_private {
             }
         }
 
-        fn assert_platform_fee_recipient_event(
+        fn assert_update_platform_fee_recipient_event(
             event: &ink_env::test::EmittedEvent,
             expected_fee_recipient: AccountId,
         ) {
@@ -797,6 +867,58 @@ pub mod sub_nft_tradable_private {
                 );
             } else {
                 panic!("encountered unexpected event kind: expected a UpdatePlatformFeeRecipient event")
+            }
+        }
+        fn assert_transfer_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_from: Option<AccountId>,
+            expected_to: Option<AccountId>,
+            expected_token_id: TokenId,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::Transfer(Transfer { from, to, id }) = decoded_event {
+                assert_eq!(from, expected_from, "encountered invalid Transfer.from");
+                assert_eq!(to, expected_to, "encountered invalid Transfer.to");
+                assert_eq!(
+                    id, expected_token_id,
+                    "encountered invalid Transfer.token_id"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a Transfer event")
+            }
+            let expected_topics = vec![
+                encoded_into_hash(&PrefixedValue {
+                    value: b"SubNFTTradablePrivate::Transfer",
+                    prefix: b"",
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubNFTTradablePrivate::Transfer::from",
+                    value: &expected_from,
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubNFTTradablePrivate::Transfer::to",
+                    value: &expected_to,
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubNFTTradablePrivate::Transfer::id",
+                    value: &expected_token_id,
+                }),
+            ];
+
+            let topics = event.topics.clone();
+            for (n, (actual_topic, expected_topic)) in
+                topics.iter().zip(expected_topics).enumerate()
+            {
+                let mut topic_hash = Hash::clear();
+                let len = actual_topic.len();
+                topic_hash.as_mut()[0..len].copy_from_slice(&actual_topic[0..len]);
+
+                assert_eq!(
+                    topic_hash, expected_topic,
+                    "encountered invalid topic at {}",
+                    n
+                );
             }
         }
         //==================================ERC721=============

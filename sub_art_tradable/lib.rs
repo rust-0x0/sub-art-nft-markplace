@@ -351,7 +351,6 @@ pub mod sub_art_tradable {
         /// A unique identifier for the tokens which have been minted (and are therefore supported)
         /// by this contract.
         token_id_nonce: TokenId,
-        current_token_id: TokenId,
         token_uris: Mapping<TokenId, String>,
         creators: Mapping<TokenId, AccountId>,
         token_supply: Mapping<TokenId, Balance>,
@@ -411,12 +410,7 @@ pub mod sub_art_tradable {
         }
 
         #[ink(message, payable)]
-        pub fn mint_to_with_uri(
-            &mut self,
-            to: AccountId,
-            supply: Balance,
-            uri: String,
-        ) -> Result<()> {
+        pub fn mint_art(&mut self, to: AccountId, supply: Balance, uri: String) -> Result<()> {
             ensure!(
                 self.env().transferred_value() >= self.platform_fee,
                 Error::InsufficientFunds
@@ -443,7 +437,7 @@ pub mod sub_art_tradable {
             Ok(())
         }
         fn get_current_token_id(&self) -> TokenId {
-            self.current_token_id
+            self.token_id_nonce
         }
         /**
          * Override isApprovedForAll to whitelist Sub contracts to enable gas-less listings.
@@ -472,13 +466,13 @@ pub mod sub_art_tradable {
          * @return uint256 for the next token ID
          */
         fn get_next_token_id(&self) -> TokenId {
-            self.current_token_id + 1
+            self.token_id_nonce + 1
         }
         /**
          * @dev increments the value of _currentTokenID
          */
         fn increment_token_type_id(&mut self) {
-            self.current_token_id += 1;
+            self.token_id_nonce += 1;
         }
         /**
          * @dev Internal function to set the token URI for a given token.
@@ -1008,14 +1002,36 @@ pub mod sub_art_tradable {
             default_accounts().charlie
         }
 
+        fn set_balance(account_id: AccountId, balance: Balance) {
+            ink_env::test::set_account_balance::<ink_env::DefaultEnvironment>(account_id, balance)
+        }
+        fn get_balance(account_id: AccountId) -> Balance {
+            ink_env::test::get_account_balance::<ink_env::DefaultEnvironment>(account_id)
+                .expect("Cannot get account balance")
+        }
+
+        fn django() -> AccountId {
+            default_accounts().django
+        }
+
+        fn eve() -> AccountId {
+            default_accounts().eve
+        }
+
+        fn frank() -> AccountId {
+            default_accounts().frank
+        }
+        fn fee_recipient() -> AccountId {
+            django()
+        }
         fn init_contract() -> SubArtTradable {
             let mut erc = SubArtTradable::new(
                 String::from("test"),
                 String::from("TEST"),
-                alice(),
-                bob(),
-                0,
-                charlie(),
+                frank(),
+                eve(),
+                10,
+                fee_recipient(),
             );
             erc.balances.insert((alice(), 1), &10);
             erc.balances.insert((alice(), 2), &20);
@@ -1024,6 +1040,86 @@ pub mod sub_art_tradable {
             erc
         }
 
+        #[ink::test]
+        fn mint_art_works() {
+            // Create a new contract instance.
+            let mut art_tradable = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let to = charlie();
+            let token_uri = String::from("token_uri:bob");
+            let supply = 10;
+            set_balance(caller, 10);
+            set_balance(fee_recipient(), 0);
+            ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(1);
+
+            assert!(art_tradable.mint_art(to, supply, token_uri.clone()).is_ok());
+            assert_eq!(get_balance(fee_recipient()), 1);
+            let token_id = art_tradable.get_current_token_id();
+            assert_eq!(art_tradable.token_supply.get(&token_id), Some(supply));
+            assert_eq!(art_tradable.creators.get(&token_id), Some(caller));
+            assert_eq!(
+                art_tradable.token_uris.get(&token_id),
+                Some(token_uri.clone())
+            );
+            assert_eq!(art_tradable.balances.get(&(to, token_id)), Some(supply));
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 2);
+            assert_uri_event(&emitted_events[0], token_uri, token_id);
+            assert_transfer_single_event(
+                &emitted_events[1],
+                Some(caller),
+                None,
+                Some(to),
+                token_id,
+                supply,
+            );
+        }
+
+        fn assert_uri_event(
+            event: &ink_env::test::EmittedEvent,
+            expected_value: ink_prelude::string::String,
+            expected_token_id: TokenId,
+        ) {
+            let decoded_event = <Event as scale::Decode>::decode(&mut &event.data[..])
+                .expect("encountered invalid contract event data buffer");
+            if let Event::Uri(Uri { value, token_id }) = decoded_event {
+                assert_eq!(value, expected_value, "encountered invalid Uri.value");
+                assert_eq!(
+                    token_id, expected_token_id,
+                    "encountered invalid Uri.token_id"
+                );
+            } else {
+                panic!("encountered unexpected event kind: expected a Uri event")
+            }
+            let expected_topics = vec![
+                encoded_into_hash(&PrefixedValue {
+                    value: b"SubArtTradable::Uri",
+                    prefix: b"",
+                }),
+                encoded_into_hash(&PrefixedValue {
+                    prefix: b"SubArtTradable::Uri::token_id",
+                    value: &expected_token_id,
+                }),
+            ];
+
+            let topics = event.topics.clone();
+            for (n, (actual_topic, expected_topic)) in
+                topics.iter().zip(expected_topics).enumerate()
+            {
+                let mut topic_hash = Hash::clear();
+                let len = actual_topic.len();
+                topic_hash.as_mut()[0..len].copy_from_slice(&actual_topic[0..len]);
+
+                assert_eq!(
+                    topic_hash, expected_topic,
+                    "encountered invalid topic at {}",
+                    n
+                );
+            }
+        }
+
+        ///==========================ERC1155===========================
         #[ink::test]
         fn can_get_correct_balance_of() {
             let erc = init_contract();

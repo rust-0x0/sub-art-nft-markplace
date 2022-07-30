@@ -1635,16 +1635,14 @@ pub mod sub_auction {
         fn contract_id() -> AccountId {
             ink_env::test::callee::<ink_env::DefaultEnvironment>()
         }
-
-        fn set_balance(account_id: AccountId, balance: Balance) {
-            ink_env::test::set_account_balance::<ink_env::DefaultEnvironment>(account_id, balance)
-        }
         fn advance_blocks(increment_block_timestamps: u128) {
             for _ in (0..increment_block_timestamps).step_by(6) {
                 ink_env::test::advance_block::<ink_env::DefaultEnvironment>();
             }
         }
-
+        fn set_balance(account_id: AccountId, balance: Balance) {
+            ink_env::test::set_account_balance::<ink_env::DefaultEnvironment>(account_id, balance)
+        }
         fn get_balance(account_id: AccountId) -> Balance {
             ink_env::test::get_account_balance::<ink_env::DefaultEnvironment>(account_id)
                 .expect("Cannot get account balance")

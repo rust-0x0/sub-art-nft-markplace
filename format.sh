@@ -16,6 +16,10 @@ function format_module() {
     cd -
 }
 
+modules=($(ls -d erc*))
+for module in ${modules[@]}; do
+        format_module $module
+done
 
 modules=($(ls -d sub*))
 for module in ${modules[@]}; do
