@@ -160,7 +160,7 @@ mod sub_art_factory_private {
                 #[cfg(test)]
                 {
                     ink_env::debug_println!("ans:{:?}", 1);
-                    Ok(AccountId::from([0xAA;32]))
+                    Ok(AccountId::from([0xAA; 32]))
                 }
                 #[cfg(not(test))]
                 {
@@ -282,7 +282,7 @@ mod sub_art_factory_private {
         fn set_caller(sender: AccountId) {
             ink_env::test::set_caller::<ink_env::DefaultEnvironment>(sender);
         }
- fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
+        fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
             ink_env::test::default_accounts::<Environment>()
         }
         fn set_balance(account_id: AccountId, balance: Balance) {
@@ -319,7 +319,14 @@ mod sub_art_factory_private {
             default_accounts().django
         }
         fn init_contract() -> SubArtFactoryPrivate {
-            let  erc = SubArtFactoryPrivate::new(frank(),eve(),1,1,fee_recipient(),Hash::from([0x99;32]));
+            let erc = SubArtFactoryPrivate::new(
+                frank(),
+                eve(),
+                1,
+                1,
+                fee_recipient(),
+                Hash::from([0x99; 32]),
+            );
 
             erc
         }
@@ -329,11 +336,10 @@ mod sub_art_factory_private {
             let mut art_factory = init_contract();
             let caller = alice();
             set_caller(caller);
-            let marketplace =bob();
+            let marketplace = bob();
             assert!(art_factory.update_marketplace(marketplace).is_ok());
 
             assert_eq!(art_factory.marketplace, marketplace);
-
         }
 
         #[ink::test]
@@ -343,7 +349,9 @@ mod sub_art_factory_private {
             let caller = alice();
             set_caller(caller);
             let bundle_marketplace = bob();
-            assert!(art_factory.update_bundle_marketplace(bundle_marketplace).is_ok());
+            assert!(art_factory
+                .update_bundle_marketplace(bundle_marketplace)
+                .is_ok());
 
             assert_eq!(art_factory.bundle_marketplace, bundle_marketplace);
         }
@@ -379,64 +387,52 @@ mod sub_art_factory_private {
             let caller = alice();
             set_caller(caller);
             let fee_recipient = bob();
-            assert!(art_factory.update_platform_fee_recipient(fee_recipient).is_ok());
+            assert!(art_factory
+                .update_platform_fee_recipient(fee_recipient)
+                .is_ok());
 
             assert_eq!(art_factory.fee_recipient, fee_recipient);
         }
- #[ink::test]
+        #[ink::test]
         fn create_nft_contract_works() {
             // Create a new contract instance.
             let mut art_factory = init_contract();
             let caller = alice();
             set_caller(caller);
-            set_balance(caller,10);
-            set_balance(fee_recipient(),0);
+            set_balance(caller, 10);
+            set_balance(fee_recipient(), 0);
             ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(1);
-        
-            let contract_addr=art_factory
-                .create_nft_contract(
-                    String::from("test"),
-                    String::from("TEST"),
-                );
+
+            let contract_addr =
+                art_factory.create_nft_contract(String::from("test"), String::from("TEST"));
             // assert_eq!(contract_addr.unwrap_err(),Error::TransferOwnershipFailed);
-            assert!(contract_addr
-                .is_ok());
-  
+            assert!(contract_addr.is_ok());
+
             // // Token 1 does not exists.
-            assert_eq!(
-                art_factory.exists.get(&contract_addr.unwrap()),
-                Some(true)
-            );
+            assert_eq!(art_factory.exists.get(&contract_addr.unwrap()), Some(true));
             assert_eq!(get_balance(fee_recipient()), 1);
             let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
             assert_eq!(emitted_events.len(), 1);
             assert_contract_created_event(&emitted_events[0], caller, contract_addr.unwrap());
         }
 
-#[ink::test]
+        #[ink::test]
         fn register_token_contract_works() {
             // Create a new contract instance.
             let mut art_factory = init_contract();
             let caller = alice();
             set_caller(caller);
-            set_balance(caller,10);
-            set_balance(fee_recipient(),0);
-            let token_contract=django();
-            // assert_eq!(art_factory   
+            set_balance(caller, 10);
+            set_balance(fee_recipient(), 0);
+            let token_contract = django();
+            // assert_eq!(art_factory
             //     .register_token_contract(
             //       token_contract,
             //     ).unwrap_err(),Error::TransferOwnershipFailed);
-            assert!(art_factory   
-                .register_token_contract(
-                  token_contract,
-                )
-                .is_ok());
-  
+            assert!(art_factory.register_token_contract(token_contract,).is_ok());
+
             // // Token 1 does not exists.
-            assert_eq!(
-                art_factory.exists.get(&token_contract),
-                Some(true)
-            );
+            assert_eq!(art_factory.exists.get(&token_contract), Some(true));
             let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
             assert_eq!(emitted_events.len(), 1);
             assert_contract_created_event(&emitted_events[0], caller, token_contract);
@@ -448,43 +444,34 @@ mod sub_art_factory_private {
             let mut art_factory = init_contract();
             let caller = alice();
             set_caller(caller);
-            set_balance(caller,10);
-            set_balance(fee_recipient(),0);
-            let token_contract=django();
-            art_factory.exists.insert(&token_contract, &true); 
+            set_balance(caller, 10);
+            set_balance(fee_recipient(), 0);
+            let token_contract = django();
+            art_factory.exists.insert(&token_contract, &true);
             // assert_eq!(contract_addr.unwrap_err(),Error::TransferOwnershipFailed);
-            assert!(art_factory   
-                .disable_token_contract(
-                  token_contract,
-                )
-                .is_ok());
-  
+            assert!(art_factory.disable_token_contract(token_contract,).is_ok());
+
             // // Token 1 does not exists.
-            assert_eq!(
-                art_factory.exists.get(&token_contract),
-                Some(false)
-            );
+            assert_eq!(art_factory.exists.get(&token_contract), Some(false));
             let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
             assert_eq!(emitted_events.len(), 1);
             assert_contract_disabled_event(&emitted_events[0], caller, token_contract);
         }
 
- #[ink::test]
+        #[ink::test]
         fn exists_contract() {
             // Create a new contract instance.
             let mut art_factory = init_contract();
             let caller = alice();
             set_caller(caller);
-            set_balance(caller,10);
-            set_balance(fee_recipient(),0);
-            let token_contract=charlie();
-            art_factory.exists.insert(&token_contract, &true); 
- 
-            // // Token 1 does not exists.
-            assert!(             art_factory.exists(token_contract)
-            );
-        }
+            set_balance(caller, 10);
+            set_balance(fee_recipient(), 0);
+            let token_contract = charlie();
+            art_factory.exists.insert(&token_contract, &true);
 
+            // // Token 1 does not exists.
+            assert!(art_factory.exists(token_contract));
+        }
 
         fn assert_contract_created_event(
             event: &ink_env::test::EmittedEvent,
@@ -556,7 +543,5 @@ mod sub_art_factory_private {
                 self.value.encode_to(dest);
             }
         }
-
-        }
-    
+    }
 }

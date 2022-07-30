@@ -96,32 +96,7 @@ pub mod sub_address_registry {
 
             Ok(())
         }
-        #[cfg_attr(test, allow(unused_variables))]
-        fn supports_interface_check(&self, callee: AccountId, data: [u8; 4]) -> bool {
-            #[cfg(test)]
-            {
-                ink_env::debug_println!("ans:{:?}", 1);
-                false
-            }
-            #[cfg(not(test))]
-            {
-                use ink_env::call::{build_call, Call, ExecutionInput};
-                let selector: [u8; 4] = [0xE6, 0x11, 0x3A, 0x8A]; //supports_interface_check
-                let (gas_limit, transferred_value) = (0, 0);
-                let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
-                    .call_type(
-                        Call::new()
-                            .callee(callee)
-                            .gas_limit(gas_limit)
-                            .transferred_value(transferred_value),
-                    )
-                    .exec_input(ExecutionInput::new(selector.into()).push_arg(data))
-                    .returns::<bool>()
-                    .fire()
-                    .map_err(|_| Error::TransactionFailed);
-                result.unwrap_or(false)
-            }
-        }
+
         /**
         @notice Update Auction contract
         @dev Only admin
@@ -302,6 +277,33 @@ pub mod sub_address_registry {
         pub fn price_seed(&self) -> AccountId {
             self.price_seed
         }
+
+        #[cfg_attr(test, allow(unused_variables))]
+        fn supports_interface_check(&self, callee: AccountId, data: [u8; 4]) -> bool {
+            #[cfg(test)]
+            {
+                ink_env::debug_println!("ans:{:?}", 1);
+                true
+            }
+            #[cfg(not(test))]
+            {
+                use ink_env::call::{build_call, Call, ExecutionInput};
+                let selector: [u8; 4] = [0xE6, 0x11, 0x3A, 0x8A]; //supports_interface_check
+                let (gas_limit, transferred_value) = (0, 0);
+                let result = build_call::<<Self as ::ink_lang::reflect::ContractEnv>::Env>()
+                    .call_type(
+                        Call::new()
+                            .callee(callee)
+                            .gas_limit(gas_limit)
+                            .transferred_value(transferred_value),
+                    )
+                    .exec_input(ExecutionInput::new(selector.into()).push_arg(data))
+                    .returns::<bool>()
+                    .fire()
+                    .map_err(|_| Error::TransactionFailed);
+                result.unwrap_or(false)
+            }
+        }
     }
 
     /// Unit tests
@@ -334,6 +336,251 @@ pub mod sub_address_registry {
             let mut erc = SubAddressRegistry::new();
 
             erc
+        }
+        #[ink::test]
+        fn update_artion_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let artion = bob();
+            assert!(address_registry.update_artion(artion).is_ok());
+
+            assert_eq!(address_registry.artion, artion);
+        }
+
+        #[ink::test]
+        fn update_auction_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let auction = bob();
+            assert!(address_registry.update_auction(auction).is_ok());
+
+            assert_eq!(address_registry.auction, auction);
+        }
+        #[ink::test]
+        fn update_marketplace_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let marketplace = bob();
+            assert!(address_registry.update_marketplace(marketplace).is_ok());
+
+            assert_eq!(address_registry.marketplace, marketplace);
+        }
+
+        #[ink::test]
+        fn update_bundle_marketplace_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let bundle_marketplace = bob();
+            assert!(address_registry
+                .update_bundle_marketplace(bundle_marketplace)
+                .is_ok());
+
+            assert_eq!(address_registry.bundle_marketplace, bundle_marketplace);
+        }
+
+        #[ink::test]
+        fn update_nft_factory_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let factory = bob();
+            assert!(address_registry.update_nft_factory(factory).is_ok());
+
+            assert_eq!(address_registry.factory, factory);
+        }
+
+        #[ink::test]
+        fn update_nft_factory_private_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let private_factory = bob();
+            assert!(address_registry
+                .update_nft_factory_private(private_factory)
+                .is_ok());
+
+            assert_eq!(address_registry.private_factory, private_factory);
+        }
+
+        #[ink::test]
+        fn update_art_factory_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let art_factory = bob();
+            assert!(address_registry.update_art_factory(art_factory).is_ok());
+
+            assert_eq!(address_registry.art_factory, art_factory);
+        }
+
+        #[ink::test]
+        fn update_art_factory_private_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let private_art_factory = bob();
+            assert!(address_registry
+                .update_art_factory_private(private_art_factory)
+                .is_ok());
+
+            assert_eq!(address_registry.private_art_factory, private_art_factory);
+        }
+
+        #[ink::test]
+        fn update_token_registry_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let token_registry = bob();
+            assert!(address_registry
+                .update_token_registry(token_registry)
+                .is_ok());
+
+            assert_eq!(address_registry.token_registry, token_registry);
+        }
+
+        #[ink::test]
+        fn update_price_seed_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let price_seed = bob();
+            assert!(address_registry.update_price_seed(price_seed).is_ok());
+
+            assert_eq!(address_registry.price_seed, price_seed);
+        }
+
+        #[ink::test]
+        fn artion_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let artion = bob();
+            address_registry.artion = artion;
+
+            assert_eq!(address_registry.artion(), artion);
+        }
+
+        #[ink::test]
+        fn auction_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let auction = bob();
+            address_registry.auction = auction;
+
+            assert_eq!(address_registry.auction(), auction);
+        }
+        #[ink::test]
+        fn marketplace_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let marketplace = bob();
+            address_registry.marketplace = marketplace;
+
+            assert_eq!(address_registry.marketplace(), marketplace);
+        }
+
+        #[ink::test]
+        fn bundle_marketplace_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let bundle_marketplace = bob();
+            address_registry.bundle_marketplace = bundle_marketplace;
+
+            assert_eq!(address_registry.bundle_marketplace(), bundle_marketplace);
+        }
+
+        #[ink::test]
+        fn nft_factory_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let factory = bob();
+            address_registry.factory = factory;
+
+            assert_eq!(address_registry.nft_factory(), factory);
+        }
+
+        #[ink::test]
+        fn nft_factory_private_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let private_factory = bob();
+            address_registry.private_factory = private_factory;
+
+            assert_eq!(address_registry.nft_factory_private(), private_factory);
+        }
+
+        #[ink::test]
+        fn art_factory_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let art_factory = bob();
+            address_registry.art_factory = art_factory;
+
+            assert_eq!(address_registry.art_factory(), art_factory);
+        }
+
+        #[ink::test]
+        fn art_factory_private_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let private_art_factory = bob();
+            address_registry.private_art_factory = private_art_factory;
+
+            assert_eq!(address_registry.art_factory_private(), private_art_factory);
+        }
+
+        #[ink::test]
+        fn token_registry_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let token_registry = bob();
+            address_registry.token_registry = token_registry;
+
+            assert_eq!(address_registry.token_registry(), token_registry);
+        }
+
+        #[ink::test]
+        fn price_seed_works() {
+            // Create a new contract instance.
+            let mut address_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let price_seed = bob();
+            address_registry.price_seed = price_seed;
+
+            assert_eq!(address_registry.price_seed(), price_seed);
         }
     }
 }

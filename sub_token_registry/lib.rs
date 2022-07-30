@@ -134,6 +134,53 @@ mod sub_token_registry {
 
             erc
         }
+        #[ink::test]
+        fn add_token_works() {
+            // Create a new contract instance.
+            let mut token_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let token = charlie();
+            assert!(token_registry.add(token).is_ok());
+
+            assert_eq!(token_registry.enabled.get(&token), Some(true));
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_token_added_event(&emitted_events[0], token);
+        }
+
+        #[ink::test]
+        fn remove_token_works() {
+            // Create a new contract instance.
+            let mut token_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let token = charlie();
+            token_registry.enabled.insert(&token, &true);
+
+            assert!(token_registry.remove(token).is_ok());
+
+            assert_eq!(token_registry.enabled.get(&token), None);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_token_removed_event(&emitted_events[0], token);
+        }
+
+        #[ink::test]
+        fn token_enabled_works() {
+            // Create a new contract instance.
+            let mut token_registry = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let token = charlie();
+            token_registry.enabled.insert(&token, &true);
+
+            assert_eq!(token_registry.enabled(token), true);
+            token_registry.enabled.insert(&token, &false);
+
+            assert_eq!(token_registry.enabled(token), false);
+        }
+
         fn assert_token_added_event(
             event: &ink_env::test::EmittedEvent,
             expected_token: AccountId,
@@ -186,29 +233,6 @@ mod sub_token_registry {
                 self.prefix.encode_to(dest);
                 self.value.encode_to(dest);
             }
-        }
-
-        fn encoded_into_hash<T>(entity: &T) -> Hash
-        where
-            T: scale::Encode,
-        {
-            use ink_env::{
-                hash::{Blake2x256, CryptoHash, HashOutput},
-                Clear,
-            };
-            let mut result = Hash::clear();
-            let len_result = result.as_ref().len();
-            let encoded = entity.encode();
-            let len_encoded = encoded.len();
-            if len_encoded <= len_result {
-                result.as_mut()[..len_encoded].copy_from_slice(&encoded);
-                return result;
-            }
-            let mut hash_output = <<Blake2x256 as HashOutput>::Type as Default>::default();
-            <Blake2x256 as CryptoHash>::hash(&encoded, &mut hash_output);
-            let copy_len = core::cmp::min(hash_output.len(), len_result);
-            result.as_mut()[0..copy_len].copy_from_slice(&hash_output[0..copy_len]);
-            result
         }
     }
 }
