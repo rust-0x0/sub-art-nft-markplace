@@ -70,8 +70,8 @@ pub mod sub_nft_factory {
             marketplace: AccountId,
             bundle_marketplace: AccountId,
             mint_fee: Balance,
-            fee_recipient: AccountId,
             platform_fee: Balance,
+            fee_recipient: AccountId,
             code_hash: Hash,
         ) -> Self {
             // This call is required in order to correctly initialize the
@@ -159,6 +159,7 @@ pub mod sub_nft_factory {
         /// @param _name Name of NFT contract
         /// @param _symbol Symbol of NFT contract
         #[ink(message, payable)]
+        #[cfg_attr(test, allow(unused_variables))]
         pub fn create_nft_contract(&mut self, name: String, symbol: String) -> Result<AccountId> {
             ensure!(
                 self.env().transferred_value() >= self.platform_fee,
@@ -174,7 +175,7 @@ pub mod sub_nft_factory {
                 #[cfg(test)]
                 {
                     ink_env::debug_println!("ans:{:?}", 1);
-                    Ok(AccountId::default())
+                    Ok(AccountId::from([0xAA;32]))
                 }
                 #[cfg(not(test))]
                 {
@@ -264,7 +265,7 @@ pub mod sub_nft_factory {
             #[cfg(test)]
             {
                 ink_env::debug_println!("ans:{:?}", 1);
-                false
+                true
             }
             #[cfg(not(test))]
             {
@@ -292,8 +293,7 @@ pub mod sub_nft_factory {
     mod tests {
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
-        // use ink_lang as ink;
-        use ink_env::Clear;
+        use ink_lang as ink;
         type Event =
             <sub_nft_tradable::SubNFTTradable as ::ink_lang::reflect::ContractEventBase>::Type;
         fn set_caller(sender: AccountId) {
@@ -302,7 +302,14 @@ pub mod sub_nft_factory {
         fn default_accounts() -> ink_env::test::DefaultAccounts<Environment> {
             ink_env::test::default_accounts::<Environment>()
         }
+        fn set_balance(account_id: AccountId, balance: Balance) {
+            ink_env::test::set_account_balance::<ink_env::DefaultEnvironment>(account_id, balance)
+        }
 
+        fn get_balance(account_id: AccountId) -> Balance {
+            ink_env::test::get_account_balance::<ink_env::DefaultEnvironment>(account_id)
+                .expect("Cannot get account balance")
+        }
         fn alice() -> AccountId {
             default_accounts().alice
         }
@@ -314,20 +321,195 @@ pub mod sub_nft_factory {
         fn charlie() -> AccountId {
             default_accounts().charlie
         }
+        fn django() -> AccountId {
+            default_accounts().django
+        }
 
+        fn eve() -> AccountId {
+            default_accounts().eve
+        }
+
+        fn frank() -> AccountId {
+            default_accounts().frank
+        }
+        fn fee_recipient() -> AccountId {
+            django()
+        }
         fn init_contract() -> SubNFTFactory {
-            let mut erc = SubNFTFactory::new(
-                alice(),
-                alice(),
-                bob(),
-                0,
-                charlie(),
-                0,
+            let  erc = SubNFTFactory::new(
+                django(),
+                eve(),
+                frank(),
+                1,
+                1,
+                fee_recipient(),
                 Hash::from([0x99; 32]),
             );
 
             erc
         }
+        #[ink::test]
+        fn update_marketplace_works() {
+            // Create a new contract instance.
+            let mut art_factory = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let marketplace =bob();
+            assert!(art_factory.update_marketplace(marketplace).is_ok());
+
+            assert_eq!(art_factory.marketplace, marketplace);
+
+        }
+
+        #[ink::test]
+        fn update_bundle_marketplace_works() {
+            // Create a new contract instance.
+            let mut art_factory = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let bundle_marketplace = bob();
+            assert!(art_factory.update_bundle_marketplace(bundle_marketplace).is_ok());
+
+            assert_eq!(art_factory.bundle_marketplace, bundle_marketplace);
+        }
+
+        #[ink::test]
+        fn update_mint_fee_works() {
+            // Create a new contract instance.
+            let mut art_factory = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let mint_fee = 10;
+            assert!(art_factory.update_mint_fee(mint_fee).is_ok());
+
+            assert_eq!(art_factory.mint_fee, mint_fee);
+        }
+
+        #[ink::test]
+        fn update_platform_fee_works() {
+            // Create a new contract instance.
+            let mut art_factory = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let platform_fee = 10;
+            assert!(art_factory.update_platform_fee(platform_fee).is_ok());
+
+            assert_eq!(art_factory.platform_fee, platform_fee);
+        }
+
+        #[ink::test]
+        fn update_platform_fee_recipient_works() {
+            // Create a new contract instance.
+            let mut art_factory = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            let fee_recipient = bob();
+            assert!(art_factory.update_platform_fee_recipient(fee_recipient).is_ok());
+
+            assert_eq!(art_factory.fee_recipient, fee_recipient);
+        }
+ #[ink::test]
+        fn create_nft_contract_works() {
+            // Create a new contract instance.
+            let mut art_factory = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            set_balance(caller,10);
+            set_balance(fee_recipient(),0);
+            ink_env::test::set_value_transferred::<ink_env::DefaultEnvironment>(1);
+        
+            let contract_addr=art_factory
+                .create_nft_contract(
+                    String::from("test"),
+                    String::from("TEST"),
+                );
+            // assert_eq!(contract_addr.unwrap_err(),Error::TransferOwnershipFailed);
+            assert!(contract_addr
+                .is_ok());
+  
+            // // Token 1 does not exists.
+            assert_eq!(
+                art_factory.exists.get(&contract_addr.unwrap()),
+                Some(true)
+            );
+            assert_eq!(get_balance(fee_recipient()), 1);
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_contract_created_event(&emitted_events[0], caller, contract_addr.unwrap());
+        }
+
+#[ink::test]
+        fn register_token_contract_works() {
+            // Create a new contract instance.
+            let mut art_factory = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            set_balance(caller,10);
+            set_balance(fee_recipient(),0);
+            let token_contract=eve();
+            // assert_eq!(art_factory   
+            //     .register_token_contract(
+            //       token_contract,
+            //     ).unwrap_err(),Error::TransferOwnershipFailed);
+            assert!(art_factory   
+                .register_token_contract(
+                  token_contract,
+                )
+                .is_ok());
+  
+            // // Token 1 does not exists.
+            assert_eq!(
+                art_factory.exists.get(&token_contract),
+                Some(true)
+            );
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_contract_created_event(&emitted_events[0], caller, token_contract);
+        }
+
+        #[ink::test]
+        fn disable_token_contract() {
+            // Create a new contract instance.
+            let mut art_factory = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            set_balance(caller,10);
+            set_balance(fee_recipient(),0);
+            let token_contract=frank();
+            art_factory.exists.insert(&token_contract, &true); 
+            // assert_eq!(contract_addr.unwrap_err(),Error::TransferOwnershipFailed);
+            assert!(art_factory   
+                .disable_token_contract(
+                  token_contract,
+                )
+                .is_ok());
+  
+            // // Token 1 does not exists.
+            assert_eq!(
+                art_factory.exists.get(&token_contract),
+                Some(false)
+            );
+            let emitted_events = ink_env::test::recorded_events().collect::<Vec<_>>();
+            assert_eq!(emitted_events.len(), 1);
+            assert_contract_disabled_event(&emitted_events[0], caller, token_contract);
+        }
+
+ #[ink::test]
+        fn exists_contract() {
+            // Create a new contract instance.
+            let mut art_factory = init_contract();
+            let caller = alice();
+            set_caller(caller);
+            set_balance(caller,10);
+            set_balance(fee_recipient(),0);
+            let token_contract=charlie();
+            art_factory.exists.insert(&token_contract, &true); 
+ 
+            // // Token 1 does not exists.
+            assert!(             art_factory.exists(token_contract)
+            );
+        }
+
 
         fn assert_contract_created_event(
             event: &ink_env::test::EmittedEvent,
@@ -401,27 +583,6 @@ pub mod sub_nft_factory {
             }
         }
 
-        fn encoded_into_hash<T>(entity: &T) -> Hash
-        where
-            T: scale::Encode,
-        {
-            use ink_env::{
-                hash::{Blake2x256, CryptoHash, HashOutput},
-                Clear,
-            };
-            let mut result = Hash::clear();
-            let len_result = result.as_ref().len();
-            let encoded = entity.encode();
-            let len_encoded = encoded.len();
-            if len_encoded <= len_result {
-                result.as_mut()[..len_encoded].copy_from_slice(&encoded);
-                return result;
-            }
-            let mut hash_output = <<Blake2x256 as HashOutput>::Type as Default>::default();
-            <Blake2x256 as CryptoHash>::hash(&encoded, &mut hash_output);
-            let copy_len = core::cmp::min(hash_output.len(), len_result);
-            result.as_mut()[0..copy_len].copy_from_slice(&hash_output[0..copy_len]);
-            result
-        }
+       
     }
 }

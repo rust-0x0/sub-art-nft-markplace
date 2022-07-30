@@ -1622,8 +1622,8 @@ pub mod sub_auction {
     mod tests {
         /// Imports all the definitions from the outer scope so we can use them here.
         use super::*;
-        use ink_env::Clear;
         use ink_lang as ink;
+        use ink_env::Clear;
         type Event = <SubAuction as ::ink_lang::reflect::ContractEventBase>::Type;
 
         fn set_caller(sender: AccountId) {
